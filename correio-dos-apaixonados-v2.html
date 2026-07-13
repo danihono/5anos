@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Correio dos Apaixonados — Agência Nº ♥</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Pinyon+Script&family=Special+Elite&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --wall:#d89a9e; --wall-deep:#c07d84;
+    --wood:#5a262d; --wood-hi:#7c3a42; --wood-deep:#40161c;
+    --brass:#c9973f; --brass-hi:#ecd08a;
+    --red:#9c2233; --red-deep:#6e1522; --wax:#a31f2e;
+    --cream:#f8eeda; --cream-old:#f1e2c4;
+    --ink:#3c2a28; --ink-soft:#77534e;
+    --telegram:#f2e2ac; --gold-ink:#8a6a20;
+    --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{min-height:100%;background:var(--wall);font-family:'Cormorant Garamond',serif;color:var(--ink)}
+  body{overflow-x:hidden;
+    background:
+      radial-gradient(1000px 700px at 50% -10%, rgba(255,240,230,.5), transparent 60%),
+      radial-gradient(1200px 900px at 50% 110%, rgba(110,21,34,.25), transparent 60%),
+      repeating-linear-gradient(90deg, rgba(255,255,255,.045) 0 2px, transparent 2px 90px),
+      linear-gradient(180deg, var(--wall) 0%, var(--wall-deep) 100%)}
+  button{font-family:inherit;cursor:pointer}
+
+  /* ═════════════ CENA 1: A PORTA ═════════════ */
+  #street{position:fixed;inset:0;z-index:500;display:grid;place-items:center;overflow:hidden;
+    background:
+      radial-gradient(800px 500px at 50% 100%, rgba(255,200,160,.18), transparent 60%),
+      linear-gradient(180deg,#2a1218 0%, #4e2229 45%, #6b3038 100%);
+    transition:opacity 1.1s ease, visibility 1.1s}
+  #street.gone{opacity:0;visibility:hidden}
+  /* calçada */
+  #street::after{content:"";position:absolute;left:0;right:0;bottom:0;height:14vh;
+    background:
+      var(--grain),
+      repeating-linear-gradient(90deg, rgba(0,0,0,.18) 0 2px, transparent 2px 110px),
+      linear-gradient(180deg,#7b6058,#4e3b36);
+    box-shadow:inset 0 8px 20px rgba(0,0,0,.4)}
+  /* luz do poste */
+  .streetlight{position:absolute;top:0;left:50%;transform:translateX(-50%);width:130vmax;height:80vh;pointer-events:none;
+    background:radial-gradient(50% 100% at 50% 0%, rgba(255,214,170,.16), transparent 70%)}
+
+  #storefront{position:relative;transform-origin:50% 60%;transition:transform 1.3s cubic-bezier(.5,0,.2,1), opacity 1.1s}
+  #street.entering #storefront{transform:scale(2.6) translateY(6%);opacity:0}
+
+  /* toldo */
+  .awning{width:min(560px,92vw);height:74px;margin:0 auto -6px;position:relative;z-index:3;
+    background:
+      var(--grain),
+      repeating-linear-gradient(90deg, var(--red) 0 46px, #f6e7d6 46px 92px);
+    border-radius:10px 10px 0 0;
+    box-shadow:0 14px 30px rgba(20,4,8,.55), inset 0 -8px 14px rgba(0,0,0,.22);
+    transform:perspective(500px) rotateX(24deg)}
+  .awning::after{content:"";position:absolute;left:0;right:0;bottom:-16px;height:16px;
+    background:
+      radial-gradient(23px 16px at 23px 0, var(--red) 96%, transparent 100%) 0 0/92px 16px repeat-x,
+      radial-gradient(23px 16px at 69px 0, #f6e7d6 96%, transparent 100%) 0 0/92px 16px repeat-x}
+  .awning .aw-text{position:absolute;inset:0;display:grid;place-items:center;
+    font-family:'Special Elite',monospace;font-size:12px;letter-spacing:.5em;color:rgba(60,10,16,.55)}
+
+  /* fachada da loja */
+  .shopwall{width:min(560px,92vw);margin:0 auto;background:
+      var(--grain),
+      linear-gradient(180deg,var(--wood-hi),var(--wood) 60%, var(--wood-deep));
+    border-radius:6px 6px 0 0;padding:26px clamp(18px,4vw,42px) 0;
+    box-shadow:0 40px 90px rgba(20,4,8,.65), inset 0 2px 0 rgba(255,215,190,.2)}
+  .shop-sign{text-align:center;padding:14px 10px 18px}
+  .shop-sign .est{font-family:'Special Elite',monospace;font-size:10.5px;letter-spacing:.4em;color:var(--brass-hi)}
+  .shop-sign h1{font-family:'Alfa Slab One',serif;font-size:clamp(20px,4vw,30px);color:var(--brass-hi);
+    letter-spacing:.03em;line-height:1.06;margin-top:6px;
+    text-shadow:0 1px 0 #6e4a10, 0 2px 0 #57390a, 0 6px 14px rgba(0,0,0,.6)}
+
+  /* a porta */
+  .doorframe{width:min(320px,74vw);margin:0 auto;perspective:1300px;position:relative}
+  .doorframe .jamb{position:absolute;inset:-14px -14px 0;border:14px solid var(--wood-deep);border-bottom:none;
+    border-radius:10px 10px 0 0;box-shadow:inset 0 0 0 2px rgba(236,208,138,.25), 0 0 40px rgba(0,0,0,.4);pointer-events:none;z-index:5}
+  /* interior visível quando a porta abre */
+  .door-inside{position:absolute;inset:0;border-radius:6px 6px 0 0;overflow:hidden;
+    background:
+      radial-gradient(300px 220px at 50% 30%, rgba(255,220,180,.35), transparent 70%),
+      linear-gradient(180deg,#8c565e,#5e3038)}
+  .door-inside .glow-slots{position:absolute;inset:12% 16% 30%;opacity:.85;
+    background:
+      repeating-linear-gradient(90deg, rgba(40,10,14,.9) 0 4px, transparent 4px 25%),
+      repeating-linear-gradient(0deg, rgba(40,10,14,.9) 0 4px, transparent 4px 33%),
+      linear-gradient(180deg,#3c161b,#2a0e12);
+    border-radius:4px;filter:blur(.4px)}
+  .door-inside .warm{position:absolute;inset:0;background:radial-gradient(60% 45% at 50% 42%, rgba(255,190,130,.28), transparent 70%)}
+
+  .door{position:relative;height:min(440px,64vh);transform-origin:left center;z-index:4;
+    transform-style:preserve-3d;cursor:pointer;border-radius:6px 6px 0 0;
+    transition:transform 1.5s cubic-bezier(.55,.05,.25,1);
+    background:
+      var(--grain),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.07) 0 2px, transparent 2px 26px),
+      linear-gradient(160deg,#8a4a52,#6b3038 55%, #57242b);
+    box-shadow:inset 0 0 0 3px rgba(236,208,138,.28), inset 0 0 30px rgba(0,0,0,.35), 6px 0 24px rgba(0,0,0,.45)}
+  .door.open{transform:rotateY(-102deg)}
+  /* vidro fosco */
+  .door .glass{position:absolute;left:11%;right:11%;top:7%;height:52%;border-radius:4px;
+    background:
+      linear-gradient(115deg, rgba(255,255,255,.28) 0%, rgba(255,255,255,.06) 30%, rgba(255,255,255,.22) 47%, rgba(255,255,255,.05) 62%, rgba(255,255,255,.16) 100%),
+      radial-gradient(140% 120% at 50% 110%, rgba(255,205,160,.25), transparent 60%),
+      rgba(240,225,215,.14);
+    box-shadow:inset 0 0 0 3px rgba(236,208,138,.4), inset 0 4px 18px rgba(0,0,0,.35);
+    display:grid;place-items:center}
+  .door .glass .gtext{text-align:center;color:rgba(255,238,215,.9);text-shadow:0 1px 3px rgba(60,10,16,.5)}
+  .door .glass .gtext .arc{font-family:'Alfa Slab One';font-size:clamp(13px,2.4vw,17px);letter-spacing:.12em}
+  .door .glass .gtext .heart{font-size:26px;margin:6px 0;color:#f2b7be}
+  .door .glass .gtext .open-lbl{font-family:'Special Elite',monospace;font-size:10px;letter-spacing:.42em;
+    border-top:1px solid rgba(255,238,215,.45);border-bottom:1px solid rgba(255,238,215,.45);padding:5px 0;margin-top:6px}
+  /* almofadas de madeira */
+  .door .panel{position:absolute;left:13%;right:13%;height:13%;border-radius:3px;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.5), inset 0 -1px 0 rgba(255,215,190,.18);
+    background:linear-gradient(160deg,#7c3f47,#5e2a31)}
+  .door .p1{bottom:22%}.door .p2{bottom:6%}
+  /* maçaneta */
+  .knob{position:absolute;right:7%;top:63%;width:26px;height:26px;border-radius:50%;z-index:6;
+    background:radial-gradient(circle at 34% 30%, var(--brass-hi), var(--brass) 55%, #6e4a10);
+    box-shadow:0 3px 8px rgba(0,0,0,.55), inset 0 -2px 4px rgba(0,0,0,.3);
+    transition:transform .15s}
+  .knob::after{content:"";position:absolute;inset:-6px;border-radius:50%;
+    box-shadow:0 0 0 0 rgba(236,208,138,.55);animation:knobpulse 2.4s ease-out infinite}
+  @keyframes knobpulse{0%{box-shadow:0 0 0 0 rgba(236,208,138,.5)}70%{box-shadow:0 0 0 14px rgba(236,208,138,0)}100%{box-shadow:0 0 0 0 rgba(236,208,138,0)}}
+  .door:hover .knob{transform:scale(1.12)}
+  /* plaquinha pendurada */
+  .hang-sign{position:absolute;left:50%;top:60.5%;transform:translateX(-50%) rotate(-2.5deg);z-index:6;
+    background:linear-gradient(180deg,#f6ead4,#e8d5ae);color:var(--red-deep);
+    font-family:'Special Elite',monospace;font-size:10.5px;letter-spacing:.2em;padding:7px 14px;
+    box-shadow:0 4px 8px rgba(0,0,0,.4);transform-origin:top center;animation:sway 4.5s ease-in-out infinite}
+  .hang-sign::before{content:"";position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+    width:2px;height:10px;background:#caa76a}
+  @keyframes sway{0%,100%{transform:translateX(-50%) rotate(-3deg)}50%{transform:translateX(-50%) rotate(2deg)}}
+  .door-hint{margin-top:22px;text-align:center;font-family:'Special Elite',monospace;font-size:11.5px;
+    letter-spacing:.28em;color:rgba(255,225,210,.65)}
+
+  /* ═════════════ CENA 2: A AGÊNCIA ═════════════ */
+  #agency{max-width:1180px;margin:0 auto;padding:34px 18px 90px;position:relative}
+  /* poeira na luz */
+  .mote{position:fixed;top:-2vh;border-radius:50%;background:rgba(255,236,214,.5);filter:blur(1px);
+    pointer-events:none;z-index:1;animation:drift linear infinite}
+  @keyframes drift{
+    0%{transform:translate(0,-4vh) }
+    100%{transform:translate(var(--dx,30px),106vh)}
+  }
+  .marquee{text-align:center;margin-bottom:8px;position:relative;z-index:2}
+  .marquee .top{font-family:'Special Elite',monospace;font-size:12px;letter-spacing:.45em;color:var(--red-deep)}
+  .marquee h2{font-family:'Alfa Slab One',serif;font-size:clamp(24px,4.6vw,40px);color:var(--cream);
+    text-shadow:0 3px 0 var(--red-deep), 0 8px 22px rgba(110,21,34,.45);margin:6px 0 2px}
+  .marquee .sub{font-family:'Pinyon Script',cursive;font-size:clamp(20px,3vw,28px);color:#fdeade}
+  #progress{display:inline-block;margin-top:14px;font-family:'Special Elite',monospace;font-size:12.5px;
+    letter-spacing:.14em;color:var(--cream);background:rgba(110,21,34,.55);border:1px solid rgba(255,235,220,.35);
+    padding:7px 18px;border-radius:30px}
+
+  .wall-frame{margin-top:26px;position:relative;z-index:2;
+    background:var(--grain), linear-gradient(180deg,var(--wood-hi),var(--wood));
+    border-radius:14px;padding:clamp(12px,2.4vw,26px);
+    box-shadow:0 34px 80px rgba(70,15,25,.5), inset 0 2px 0 rgba(255,220,200,.25), inset 0 -14px 30px rgba(0,0,0,.35)}
+  .wall-plaque{width:fit-content;margin:0 auto 14px;background:linear-gradient(180deg,var(--brass-hi),var(--brass));
+    color:#4a3208;font-family:'Special Elite',monospace;font-size:12px;letter-spacing:.3em;
+    padding:6px 22px;border-radius:4px;box-shadow:0 2px 5px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.6)}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(10px,1.8vw,18px)}
+  @media (max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}}
+
+  .slot{position:relative;aspect-ratio:1/.92;border-radius:8px;cursor:pointer;border:none;text-align:center;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(0,0,0,.55), rgba(0,0,0,.75)),
+      linear-gradient(180deg,#3c161b,#2a0e12);
+    box-shadow:inset 0 6px 18px rgba(0,0,0,.8), inset 0 -2px 0 rgba(255,200,170,.12), 0 2px 0 rgba(255,210,190,.15);
+    transition:transform .16s ease}
+  .slot:hover{transform:translateY(-3px)}
+  .slot:focus-visible{outline:3px solid var(--brass-hi);outline-offset:3px}
+  .slot .plate{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:4;
+    background:linear-gradient(180deg,var(--brass-hi),var(--brass));color:#4a3208;
+    font-family:'Special Elite',monospace;font-size:clamp(9px,1.2vw,11.5px);letter-spacing:.12em;
+    padding:3px 10px;border-radius:3px;white-space:nowrap;
+    box-shadow:0 2px 4px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.6)}
+  .peek{position:absolute;left:50%;bottom:22%;transform:translateX(-50%) rotate(var(--tilt,-4deg));
+    width:76%;aspect-ratio:1.62/1;background:var(--grain), linear-gradient(180deg,var(--cream),var(--cream-old));
+    border-radius:3px;box-shadow:0 6px 14px rgba(0,0,0,.6);transition:transform .25s cubic-bezier(.3,1.4,.5,1)}
+  .slot:hover .peek{transform:translateX(-50%) rotate(var(--tilt,-4deg)) translateY(-8px)}
+  .peek::before{content:"";position:absolute;inset:0;border-radius:3px;
+    background:repeating-linear-gradient(45deg, transparent 0 10px, rgba(156,34,51,.85) 10px 16px, transparent 16px 26px);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);mask-composite:exclude;
+    -webkit-mask-composite:xor;padding:5px;pointer-events:none}
+  .peek .mini-seal{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+    width:22%;aspect-ratio:1;border-radius:46% 54% 51% 49%/52% 47% 53% 48%;
+    background:radial-gradient(circle at 36% 30%, #d0525f, var(--wax) 55%, #5e0d18);
+    box-shadow:0 2px 4px rgba(0,0,0,.4)}
+  .peek.telegram-peek{background:var(--grain), linear-gradient(180deg,var(--telegram),#e4cf8e)}
+  .peek.telegram-peek::before{background:repeating-linear-gradient(0deg, transparent 0 6px, rgba(60,42,40,.12) 6px 7px);
+    -webkit-mask:none;mask:none;padding:0}
+  .peek.telegram-peek .mini-seal{display:none}
+  .peek .tg-label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    font-family:'Special Elite',monospace;font-size:clamp(8px,1vw,10px);letter-spacing:.2em;color:var(--red-deep)}
+  .slot.opened .peek{opacity:.45}
+  .slot.opened::after{content:"♥ entregue";position:absolute;top:8px;right:10px;z-index:5;
+    font-family:'Pinyon Script',cursive;font-size:15px;color:#f5b8c0}
+
+  .parcel-slot .peek{background:var(--grain), linear-gradient(160deg,#c9a06a,#a87e48);aspect-ratio:1.3/1;bottom:20%}
+  .parcel-slot .peek::before{background:
+      linear-gradient(90deg, transparent 46%, rgba(110,21,34,.9) 46% 54%, transparent 54%),
+      linear-gradient(0deg, transparent 46%, rgba(110,21,34,.9) 46% 54%, transparent 54%);
+    -webkit-mask:none;mask:none;padding:0}
+  .parcel-slot .peek .mini-seal{display:none}
+  .parcel-slot .peek .tag{position:absolute;right:-8px;bottom:-6px;background:var(--cream);
+    font-family:'Pinyon Script',cursive;font-size:clamp(10px,1.4vw,14px);color:var(--ink);
+    padding:2px 8px;transform:rotate(6deg);box-shadow:0 2px 5px rgba(0,0,0,.4)}
+
+  footer{margin-top:40px;text-align:center;font-family:'Special Elite',monospace;font-size:11px;
+    letter-spacing:.24em;color:rgba(255,235,225,.75);position:relative;z-index:2}
+
+  /* ═════════════ MODAL ═════════════ */
+  #overlay{position:fixed;inset:0;z-index:600;display:none;place-items:center;padding:16px;
+    background:rgba(60,10,18,.74);backdrop-filter:blur(5px)}
+  #overlay.open{display:grid}
+  #stage{width:min(640px,96vw);max-height:92vh;overflow-y:auto;position:relative;scrollbar-width:thin}
+  #close-x{position:absolute;top:-4px;right:2px;z-index:20;background:none;border:none;color:var(--cream);
+    font-size:34px;line-height:1;text-shadow:0 2px 6px rgba(0,0,0,.5)}
+
+  /* envelope realista */
+  .env-scene{display:grid;place-items:center;padding:46px 0 30px;perspective:1100px}
+  .envelope{width:min(460px,88vw);aspect-ratio:1.58/1;position:relative;transform-style:preserve-3d;
+    filter:drop-shadow(0 34px 40px rgba(30,4,10,.6));transition:transform .8s ease, opacity .6s}
+  .envelope.away{transform:translateY(24%) scale(.86) rotateX(18deg);opacity:0}
+  .env-back{position:absolute;inset:0;border-radius:6px;
+    background:var(--grain), linear-gradient(180deg,#efe1c2,#e6d2a8)}
+  /* carta dentro */
+  .letter-mini{position:absolute;left:4%;right:4%;top:6%;height:88%;border-radius:3px;z-index:2;
+    background:var(--grain), linear-gradient(180deg,var(--cream),#f2e5c9);
+    box-shadow:0 -4px 14px rgba(0,0,0,.18);
+    transition:transform 1.1s cubic-bezier(.4,0,.2,1);padding:16px;overflow:hidden}
+  .letter-mini .scribble{height:7px;border-radius:4px;background:rgba(119,83,78,.28);margin:9px 12% 0 6%}
+  .letter-mini .scribble:nth-child(2n){margin-right:26%}
+  .letter-mini .greet{font-family:'Pinyon Script',cursive;font-size:22px;color:var(--red-deep)}
+  .envelope.rising .letter-mini{transform:translateY(-64%)}
+  /* bolso frontal */
+  .env-front{position:absolute;inset:0;border-radius:6px;z-index:3;overflow:hidden;
+    background:var(--grain), linear-gradient(180deg,var(--cream) 0%, var(--cream-old) 100%);
+    clip-path:polygon(0 0, 50% 34%, 100% 0, 100% 100%, 0 100%)}
+  .env-front::before{content:"";position:absolute;inset:0;padding:8px;pointer-events:none;
+    background:repeating-linear-gradient(45deg, var(--red) 0 12px, transparent 12px 24px, #cf7d8a 24px 36px, transparent 36px 48px);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude}
+  .env-front::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg, rgba(0,0,0,.10), transparent 18%)}
+  .env-front .addr{position:absolute;left:9%;bottom:13%;text-align:left}
+  .env-front .addr .to{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.2em;color:var(--ink-soft)}
+  .env-front .addr .name{font-family:'Pinyon Script',cursive;font-size:clamp(25px,4.6vw,34px);color:var(--ink)}
+  .env-front .addr .line{width:150px;height:1px;background:rgba(119,83,78,.4);margin-top:4px}
+  .env-front .stamp-corner{position:absolute;top:14px;right:16px;width:64px;height:76px;transform:rotate(3deg);
+    background:radial-gradient(circle, transparent 3.5px, var(--cream) 4px), linear-gradient(160deg,#e77286,var(--red));
+    background-size:12px 12px, cover;display:grid;place-items:center;color:#fff;
+    box-shadow:0 2px 6px rgba(0,0,0,.25)}
+  .env-front .stamp-corner span{font-family:'Alfa Slab One';font-size:20px;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .env-front .stamp-corner small{font-family:'Special Elite';font-size:8px;letter-spacing:.15em}
+  .env-front .pm-mini{position:absolute;top:22px;right:64px;width:74px;height:74px;opacity:.5;transform:rotate(-12deg)}
+  .env-front .pm-mini circle{fill:none;stroke:var(--red-deep);stroke-width:2}
+  /* aba */
+  .flap{position:absolute;inset:0 0 auto 0;height:56%;z-index:6;transform-origin:top center;
+    transform-style:preserve-3d;transition:transform 1s cubic-bezier(.6,-0.18,.3,1.05);
+    clip-path:polygon(0 0,100% 0,50% 100%)}
+  .flap .front{position:absolute;inset:0;backface-visibility:hidden;
+    background:var(--grain), linear-gradient(180deg,#f4e8cd,#e9d6ad);border-radius:6px 6px 0 0;
+    box-shadow:inset 0 -12px 16px -12px rgba(0,0,0,.35)}
+  .flap .back{position:absolute;inset:0;transform:rotateX(180deg);backface-visibility:hidden;
+    background:linear-gradient(0deg,#efe0bf,#e2cd9f)}
+  .envelope.opened .flap{transform:rotateX(176deg);z-index:1;transition-delay:.05s}
+
+  /* lacre de cera com relevo e gota */
+  .seal{position:absolute;left:50%;top:53%;transform:translate(-50%,-50%);z-index:8;width:96px;height:96px;
+    border:none;border-radius:47% 53% 49% 51%/53% 46% 54% 47%;
+    background:
+      radial-gradient(circle at 33% 26%, rgba(255,255,255,.35), transparent 42%),
+      radial-gradient(circle at 50% 55%, #b93544 0%, var(--wax) 46%, #6d1420 78%, #4e0c14 100%);
+    box-shadow:0 8px 18px rgba(78,12,20,.6), inset 0 -4px 10px rgba(0,0,0,.4), inset 0 3px 6px rgba(255,160,150,.25);
+    display:grid;place-items:center;transition:transform .12s}
+  .seal::before{content:"";position:absolute;right:-9px;bottom:12px;width:20px;height:26px;
+    border-radius:60% 40% 55% 45%/50% 55% 45% 60%;
+    background:radial-gradient(circle at 40% 30%, #b93544, #6d1420);box-shadow:inset 0 -2px 4px rgba(0,0,0,.35)}
+  .seal .emboss{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;
+    box-shadow:inset 0 2px 5px rgba(0,0,0,.5), inset 0 -1px 2px rgba(255,170,160,.35);
+    color:#e9a9a4;font-family:'Pinyon Script',cursive;font-size:34px;
+    text-shadow:0 -1px 1px rgba(0,0,0,.6), 0 1px 1px rgba(255,190,180,.35)}
+  .seal:active{transform:translate(-50%,-50%) scale(.94)}
+  .seal .ring{position:absolute;inset:-10px;border-radius:50%}
+  .seal .ring circle{fill:none;stroke:#ffd9a8;stroke-width:4;stroke-linecap:round;
+    stroke-dasharray:339;stroke-dashoffset:339;transform:rotate(-90deg);transform-origin:center}
+  .seal.cracking{animation:crackshake .3s linear}
+  @keyframes crackshake{0%,100%{transform:translate(-50%,-50%)}25%{transform:translate(-52%,-49%) rotate(-3deg)}75%{transform:translate(-48%,-51%) rotate(3deg)}}
+  .seal-half{position:absolute;left:50%;top:53%;width:96px;height:96px;z-index:9;pointer-events:none;
+    background:radial-gradient(circle at 50% 55%, #b93544 0%, var(--wax) 46%, #6d1420 80%);
+    border-radius:47% 53% 49% 51%/53% 46% 54% 47%}
+  .seal-half.l{clip-path:polygon(0 0,56% 0,44% 48%, 58% 100%, 0 100%);animation:fall-l 1s cubic-bezier(.4,0,.8,1) forwards}
+  .seal-half.r{clip-path:polygon(56% 0,100% 0,100% 100%,58% 100%,44% 48%);animation:fall-r 1s cubic-bezier(.4,0,.8,1) forwards}
+  @keyframes fall-l{from{transform:translate(-50%,-50%)}to{transform:translate(-150%,80%) rotate(-75deg);opacity:0}}
+  @keyframes fall-r{from{transform:translate(-50%,-50%)}to{transform:translate(46%,90%) rotate(66deg);opacity:0}}
+  .crumb{position:absolute;z-index:9;width:7px;height:7px;border-radius:40% 60% 55% 45%;pointer-events:none;
+    background:#7d1826;animation:crumbfall .9s ease-in forwards}
+  @keyframes crumbfall{to{transform:translate(var(--cx),120px) rotate(200deg);opacity:0}}
+  .hint{margin-top:20px;text-align:center;font-family:'Special Elite',monospace;font-size:12.5px;
+    letter-spacing:.16em;color:#ffd9cf}
+
+  /* carta completa */
+  .letter{background:var(--grain), linear-gradient(180deg,var(--cream) 0%, #f3e6c9 100%);border-radius:5px;
+    padding:clamp(26px,5vw,48px);position:relative;box-shadow:0 30px 70px rgba(40,5,12,.65);
+    animation:rise .8s cubic-bezier(.2,1,.3,1)}
+  /* vincos de dobra */
+  .letter::before,.letter::after{content:"";position:absolute;left:0;right:0;height:2px;pointer-events:none;
+    background:linear-gradient(180deg, rgba(0,0,0,.07), rgba(255,255,255,.5))}
+  .letter::before{top:33.3%}.letter::after{top:66.6%}
+  @keyframes rise{from{transform:translateY(50px) rotateX(8deg);opacity:0}to{transform:none;opacity:1}}
+  .letter .postmark{position:absolute;top:18px;right:20px;width:110px;height:110px;opacity:.8;transform:rotate(8deg)}
+  .letter .postmark text{font-family:'Special Elite',monospace;fill:var(--red-deep);letter-spacing:2px}
+  .letter .stamp2{position:absolute;top:26px;right:118px;width:58px;height:70px;transform:rotate(-4deg);
+    background:radial-gradient(circle, transparent 3px, var(--cream) 3.5px), linear-gradient(160deg,#e77286,var(--red));
+    background-size:11px 11px,cover;display:grid;place-items:center;color:#fff;box-shadow:0 2px 5px rgba(0,0,0,.25)}
+  .letter .stamp2 span{font-family:'Alfa Slab One';font-size:17px}
+  .letter .date-line{font-family:'Special Elite',monospace;font-size:12.5px;letter-spacing:.14em;color:var(--ink-soft)}
+  .letter h3{font-family:'Pinyon Script',cursive;font-size:clamp(30px,6vw,42px);color:var(--red-deep);
+    margin:14px 0 10px;line-height:1.05}
+  .letter .body{font-size:clamp(17px,2.4vw,19.5px);line-height:1.75;font-weight:500}
+  .letter .ps{margin-top:22px;font-family:'Pinyon Script',cursive;font-size:clamp(21px,3.4vw,26px);color:var(--gold-ink)}
+  .letter .kiss{position:absolute;bottom:18px;right:26px;font-size:22px;opacity:.85;transform:rotate(-8deg)}
+
+  /* ── filme dentro da carta ── */
+  .film{position:relative;margin:18px 0 6px;border-radius:6px;overflow:hidden;
+    background:#17090c;box-shadow:0 10px 26px rgba(30,4,10,.45), inset 0 0 0 3px #2b1216;
+    border:6px solid #24080d}
+  .film video{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#000}
+  .film .grain-ov{position:absolute;inset:0;pointer-events:none;opacity:.5;mix-blend-mode:overlay;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.5'/%3E%3C/svg%3E");
+    animation:grainjump .5s steps(3) infinite}
+  @keyframes grainjump{0%{transform:translate(0,0)}33%{transform:translate(-6px,4px)}66%{transform:translate(5px,-5px)}100%{transform:translate(0,0)}}
+  .film .vignette{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(115% 95% at 50% 50%, transparent 58%, rgba(10,2,4,.55) 100%)}
+  .film .reel-tag{position:absolute;left:10px;bottom:8px;font-family:'Special Elite',monospace;
+    font-size:10.5px;letter-spacing:.2em;color:rgba(255,230,210,.8);text-shadow:0 1px 2px #000}
+  .film .heart-rec{position:absolute;right:10px;top:8px;font-family:'Special Elite',monospace;
+    font-size:10.5px;letter-spacing:.14em;color:#ff8f9b;text-shadow:0 1px 2px #000;
+    animation:blinkrec 1.4s steps(1) infinite}
+  @keyframes blinkrec{50%{opacity:.25}}
+  .film .mute-btn{position:absolute;right:8px;bottom:8px;background:rgba(20,5,8,.65);color:#ffe3d6;border:1px solid rgba(255,220,200,.35);
+    border-radius:4px;font-family:'Special Elite',monospace;font-size:10px;letter-spacing:.1em;padding:5px 9px}
+  /* bobina em revelação (placeholder sem vídeo) */
+  .film .developing{aspect-ratio:16/9;display:grid;place-items:center;color:#caa0a6;text-align:center}
+  .film .developing .reel{width:52px;height:52px;border-radius:50%;margin:0 auto 10px;position:relative;
+    border:3px solid #6b3a42;animation:spinreel 5s linear infinite}
+  .film .developing .reel::before{content:"";position:absolute;inset:6px;border-radius:50%;border:2px dashed #6b3a42}
+  .film .developing .reel::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px;
+    border-radius:50%;background:#6b3a42}
+  @keyframes spinreel{to{transform:rotate(360deg)}}
+  .film .developing p{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.22em}
+
+  /* telegrama */
+  .letter.tg{background:var(--grain), linear-gradient(180deg,var(--telegram),#e8d296)}
+  .letter.tg .tg-head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px double var(--ink);
+    padding-bottom:10px;margin-bottom:16px}
+  .letter.tg .tg-head b{font-family:'Special Elite',monospace;font-size:clamp(15px,2.6vw,19px);letter-spacing:.24em}
+  .letter.tg .tg-head small{font-family:'Special Elite',monospace;font-size:10px;letter-spacing:.2em;color:var(--red-deep)}
+  .letter.tg .body{font-family:'Special Elite',monospace;font-size:clamp(14px,2.2vw,16.5px);line-height:2;text-transform:uppercase}
+  .letter.tg h3{display:none}
+
+  /* encomenda / assinatura */
+  .parcel-card{background:var(--grain), linear-gradient(160deg,#c9a06a,#a87e48);border-radius:8px;
+    padding:clamp(26px,5vw,44px);text-align:center;box-shadow:0 30px 70px rgba(40,5,12,.65);position:relative;
+    animation:rise .7s cubic-bezier(.2,1,.3,1)}
+  .parcel-card::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:8px;
+    background:
+      linear-gradient(90deg, transparent calc(50% - 14px), rgba(110,21,34,.85) calc(50% - 14px) calc(50% + 14px), transparent calc(50% + 14px)),
+      linear-gradient(0deg, transparent calc(50% - 14px), rgba(110,21,34,.85) calc(50% - 14px) calc(50% + 14px), transparent calc(50% + 14px))}
+  .parcel-card h3{font-family:'Alfa Slab One';color:#402a08;font-size:clamp(19px,3.4vw,26px);letter-spacing:.06em;position:relative;z-index:2;
+    background:var(--cream);display:inline-block;padding:8px 20px;transform:rotate(-2deg);box-shadow:0 4px 10px rgba(0,0,0,.3)}
+  .parcel-card p{position:relative;z-index:2;background:rgba(248,238,218,.95);margin:18px auto 0;max-width:420px;
+    padding:14px 18px;font-size:16.5px;line-height:1.6;box-shadow:0 4px 10px rgba(0,0,0,.2)}
+  .sig-zone{position:relative;z-index:2;background:var(--cream);margin:20px auto 0;max-width:440px;padding:16px;
+    box-shadow:0 4px 10px rgba(0,0,0,.25)}
+  .sig-zone .lbl{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.2em;color:var(--ink-soft)}
+  #sig{width:100%;height:120px;touch-action:none;background:
+    linear-gradient(transparent 96px, var(--ink-soft) 97px, transparent 98px);cursor:crosshair}
+  .sig-zone .row{display:flex;gap:10px;justify-content:center;margin-top:10px}
+  .sig-zone button{border:none;padding:11px 20px;font-family:'Special Elite',monospace;font-size:12.5px;
+    letter-spacing:.14em;border-radius:4px}
+  #sig-clear{background:#e2d3b2;color:var(--ink)}
+  #sig-ok{background:var(--red);color:var(--cream)}
+  #sig-ok:disabled{opacity:.45;cursor:not-allowed}
+
+  .final{background:var(--grain), linear-gradient(180deg,var(--cream),#f6e4cf);border-radius:8px;text-align:center;
+    padding:clamp(30px,6vw,54px);box-shadow:0 30px 70px rgba(40,5,12,.65);animation:rise .7s cubic-bezier(.2,1,.3,1)}
+  .final .top{font-family:'Special Elite',monospace;font-size:11.5px;letter-spacing:.4em;color:var(--red)}
+  .final h2{font-family:'Pinyon Script',cursive;font-size:clamp(40px,8vw,64px);color:var(--red-deep);margin:10px 0}
+  .final .body{font-size:clamp(17px,2.6vw,20px);line-height:1.8;max-width:460px;margin:0 auto}
+  .final .assin{margin-top:26px;font-family:'Pinyon Script',cursive;font-size:clamp(24px,4vw,30px);color:var(--gold-ink)}
+  .final .carimbo{width:fit-content;margin:26px auto 0;border:5px double var(--red);color:var(--red);
+    font-family:'Special Elite',monospace;font-size:clamp(15px,2.6vw,19px);letter-spacing:.22em;padding:10px 22px;
+    transform:rotate(-6deg) scale(3);opacity:0;transition:transform .5s cubic-bezier(.2,1.7,.4,1), opacity .3s}
+  .final .carimbo.on{opacity:.9;transform:rotate(-6deg) scale(1)}
+
+  .heart-p{position:fixed;z-index:900;pointer-events:none;font-size:20px;animation:heartfall linear forwards}
+  @keyframes heartfall{from{transform:translateY(-40px) rotate(0)}to{transform:translateY(110vh) rotate(340deg);opacity:.2}}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- Personalização: bloco CONFIG no <script> ao fim do arquivo.
+     Cada carta tem um campo video: null — troque por "url-do-video.mp4"
+     quando os 10 vídeos de IA estiverem prontos. ♥ -->
+
+<!-- ═════ CENA 1: A RUA E A PORTA ═════ -->
+<div id="street">
+  <div class="streetlight"></div>
+  <div id="storefront">
+    <div class="awning"><div class="aw-text">DESDE 2021 ✦ ENTREGAS AO CORAÇÃO</div></div>
+    <div class="shopwall">
+      <div class="shop-sign">
+        <div class="est">AGÊNCIA Nº ♥</div>
+        <h1>CORREIO DOS APAIXONADOS</h1>
+      </div>
+      <div class="doorframe">
+        <div class="door-inside">
+          <div class="glow-slots"></div><div class="warm"></div>
+        </div>
+        <div class="door" id="door" role="button" tabindex="0" aria-label="Abrir a porta">
+          <div class="glass">
+            <div class="gtext">
+              <div class="arc">CORREIO DOS<br>APAIXONADOS</div>
+              <div class="heart">♥</div>
+              <div class="open-lbl">CORRESPONDÊNCIAS · 5 ANOS</div>
+            </div>
+          </div>
+          <div class="hang-sign">ABERTO — PARA SEMPRE</div>
+          <div class="panel p1"></div>
+          <div class="panel p2"></div>
+          <div class="knob" id="knob"></div>
+        </div>
+        <div class="jamb"></div>
+      </div>
+    </div>
+    <div class="door-hint">TOQUE NA PORTA PARA ENTRAR</div>
+  </div>
+</div>
+
+<!-- ═════ CENA 2: A AGÊNCIA ═════ -->
+<main id="agency">
+  <div class="marquee">
+    <div class="top">✦ POSTE RESTANTE ✦ SEÇÃO DE CARTAS GUARDADAS HÁ 5 ANOS ✦</div>
+    <h2>SUA CORRESPONDÊNCIA CHEGOU</h2>
+    <div class="sub" id="m-sub"></div>
+    <div id="progress">correspondências abertas: 0/0</div>
+  </div>
+  <div class="wall-frame">
+    <div class="wall-plaque">ESCANINHOS · RETIRADA MEDIANTE SORRISO</div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <footer>CORREIO DOS APAIXONADOS ✦ NENHUMA CARTA SE PERDE QUANDO O ENDEREÇO É VOCÊ</footer>
+</main>
+
+<div id="overlay">
+  <div id="stage">
+    <button id="close-x" aria-label="Fechar">×</button>
+    <div id="stage-content"></div>
+  </div>
+</div>
+
+<script>
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  CONFIG — EDITE SOMENTE AQUI                                 ║
+   ║  video: null  →  troque por "https://.../momento01.mp4"      ║
+   ║  (h.264/mp4, ~6s, 720p; pode hospedar no Firebase Storage)   ║
+   ║  poster: opcional, imagem de capa do vídeo                   ║
+   ║  tipo: "carta" ou "telegrama"                                ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+const CONFIG = {
+  ela: "Isadora",
+  ele: "Daniel",                   // EDITE: seu nome
+
+  cartas: [
+    { tipo:"carta", data:"14 de agosto de 2021", cidade:"CAMPINAS · SP",
+      titulo:"O dia em que eu pedi",
+      texto:"Registro oficial desta agência: em 14 de agosto de 2021, numa mesa do The Fifties, no Iguatemi, um garoto de 15 anos ensaiava uma pergunta por dentro, com o coração batendo mais alto que a música do restaurante. Do outro lado da mesa, você — 14 anos e o sorriso que desmontava todo o meu ensaio. A coragem saiu, a pergunta saiu, e você disse sim. Num restaurante que imita os anos 50 começou a história que eu pretendo levar até os anos que ainda nem inventaram.",
+      ps:"P.S. — o nervosismo passou. o amor, esse nunca foi embora.",
+      video:"videos/01-pedido-de-namoro.mp4", poster:null },   // ← VÍDEO 01 ✔
+
+    { tipo:"carta", data:"14 de agosto de 2022", cidade:"CAMPINAS · SP",
+      titulo:"Um ano de nós",
+      texto:"Primeiro aniversário oficial desta correspondência. Comemoramos no Coco Bambu, e eu lembro de olhar pra você do outro lado da mesa e pensar: um ano. Na época parecia muito. Hoje eu sei que era só o aquecimento. A mesa era farta, mas a melhor parte do jantar continuava sendo a companhia.",
+      ps:"P.S. — de todos os pratos daquela noite, o que eu escolheria de novo é você.",
+      video:null, poster:null },   // ← VÍDEO 02
+
+    { tipo:"carta", data:"setembro de 2023", cidade:"RIVIERA · SP",
+      titulo:"Nossa primeira viagem",
+      texto:"Consta nos arquivos: nossa primeira viagem juntos foi para a Riviera, e o relatório resume assim — sol, areia e altinhas sem fim. A bola subia, a gente ria, e ninguém contava os pontos porque o placar não importava. Descobri ali que viajar com você era a minha modalidade favorita.",
+      ps:"P.S. — a altinha a gente deixava cair às vezes. a parceria, nunca.",
+      video:null, poster:null },   // ← VÍDEO 03
+
+    { tipo:"carta", data:"dezembro de 2023", cidade:"DA ARQUIBANCADA AO CORAÇÃO",
+      titulo:"Minha última partida",
+      texto:"Esta carta registra um dos momentos mais marcados da minha vida. Minha última partida. E se você me perguntar o que ficou, não foi o título — foi levantar o olhar e encontrar você na arquibancada, torcendo por mim. Campeão eu fui naquele dia. Mas sortudo eu já era muito antes do apito inicial.",
+      ps:"P.S. — encerrei um capítulo em campo sabendo que o melhor jogo da minha vida era fora dele.",
+      video:null, poster:null },   // ← VÍDEO 04
+
+    { tipo:"telegrama", data:"janeiro de 2024", cidade:"MARATAÍZES · ES",
+      texto:"RELATORIO DO CAMPING DO SIRI PT CONSTATADO VICIO DA SRTA ISADORA EM SORVETES PT CONSTATADO VICIO DO REMETENTE EM COMER OS SORVETES DA SRTA ISADORA PT CASO SEM SOLUCAO PT E SEM RECLAMACOES PT",
+      video:null, poster:null },   // ← VÍDEO 05
+
+    { tipo:"carta", data:"dezembro de 2024", cidade:"NO MEIO DA MULTIDÃO",
+      titulo:"O nosso show",
+      texto:"Houve um show marcado para a nossa vida. Foi divertido de um jeito diferente, daqueles que a memória guarda em alta definição: música alta, nós dois no meio de todo mundo e ao mesmo tempo sozinhos no nosso mundo. Tem noite que acaba quando as luzes acendem. Essa não acabou até hoje.",
+      ps:"P.S. — de todas as músicas daquela noite, a minha favorita continua sendo a sua risada.",
+      video:null, poster:null },   // ← VÍDEO 06
+
+    { tipo:"telegrama", data:"janeiro de 2025", cidade:"ESPAÇO AÉREO",
+      texto:"DECOLAGEM CONFIRMADA PT PRIMEIRO VOO JUNTOS RUMO A FLORIANOPOLIS PT MAOS DADAS ACIMA DAS NUVENS PT ALTITUDE ELEVADA VG CORACAO MAIS AINDA PT",
+      video:null, poster:null },   // ← VÍDEO 07
+
+    { tipo:"carta", data:"agosto de 2025", cidade:"A BORDO DO CORSA",
+      titulo:"Nosso lugar favorito tem rodas",
+      texto:"Neste mês chegou meu primeiro carro. E sem querer, chegou também o nosso programa favorito: andar de Corsa ouvindo música, sem destino obrigatório. Descobri que não precisa de muito — um volante, você no banco do lado, uma playlist. O resto do mundo pode esperar lá fora.",
+      ps:"P.S. — qualquer caminho serve, desde que você esteja no banco do passageiro.",
+      video:null, poster:null },   // ← VÍDEO 08
+
+    { tipo:"carta", data:"abril de 2026", cidade:"NATAL · RN",
+      titulo:"A melhor viagem com amigos",
+      texto:"Registro em ata: a melhor viagem já feita com amigos. E o momento histórico dela — a descoberta do lugar preferido da história da Isadora, um lugar que só tinha comida. Ficamos chocados. Você ficou em êxtase. A perícia conclui: o caminho para o seu coração passa oficialmente pela cozinha.",
+      ps:"P.S. — anexo a esta carta: a sua cara de felicidade na frente daquela comida toda.",
+      video:null, poster:null },   // ← VÍDEO 09
+
+    { tipo:"carta", data:"junho de 2026", cidade:"CAMPOS DO JORDÃO · SP",
+      titulo:"Sozinhos, finalmente",
+      texto:"Nossa primeira viagem só nós dois. Campos do Jordão, frio na medida, fondue na mesa e a certeza esquentando por dentro: eu quero isso para sempre. Cinco anos depois daquele garoto nervoso do The Fifties, aqui estamos — e a única coisa que mudou foi o tamanho do amor. Cresceu.",
+      ps:"P.S. — abre a encomenda. tem uma coisa te esperando.",
+      video:null, poster:null },   // ← VÍDEO 10
+  ],
+
+  encomenda: {
+    instrucao:"Encomenda registrada de valor inestimável. Para receber, a destinatária deve assinar abaixo.",
+    titulo:"Feliz 5 anos, meu amor",
+    mensagem:"Obrigado por cinco anos de cartas vivas, entregues todo dia no meu peito. Que a gente continue escrevendo essa história com a melhor caligrafia que existe: a nossa. Eu te amo hoje, amanhã e em todas as datas que o carimbo alcançar.",
+    carimbo:"ENTREGUE COM AMOR · VÁLIDO PARA SEMPRE"
+  }
+};
+
+/* ═════════════ maquinário ═════════════ */
+const grid = document.getElementById('grid');
+const overlay = document.getElementById('overlay');
+const stageContent = document.getElementById('stage-content');
+const opened = new Set();
+const preloaded = {};
+
+document.getElementById('m-sub').textContent =
+  `${CONFIG.cartas.length} correspondências e uma encomenda, aos cuidados de ${CONFIG.ela}`;
+
+/* ── porta ── */
+const door = document.getElementById('door');
+let doorOpened=false;
+function enterAgency(){
+  if(doorOpened) return; doorOpened=true;
+  chime();
+  door.classList.add('open');
+  creakSound();
+  setTimeout(()=>{
+    document.getElementById('street').classList.add('entering');
+    setTimeout(()=>document.getElementById('street').classList.add('gone'), 900);
+  }, 950);
+}
+door.addEventListener('click', enterAgency);
+door.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') enterAgency(); });
+
+/* ── poeira flutuando ── */
+(function motes(){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for(let i=0;i<16;i++){
+    const m=document.createElement('div'); m.className='mote';
+    const s=2+Math.random()*3.5;
+    m.style.width=m.style.height=s+'px';
+    m.style.left=Math.random()*100+'vw';
+    m.style.setProperty('--dx',(Math.random()*80-40)+'px');
+    m.style.animationDuration=(14+Math.random()*18)+'s';
+    m.style.animationDelay=(-Math.random()*20)+'s';
+    m.style.opacity=.25+Math.random()*.4;
+    document.body.appendChild(m);
+  }
+})();
+
+/* ── escaninhos ── */
+CONFIG.cartas.forEach((c,i)=>{
+  const b=document.createElement('button');
+  b.className='slot'; b.dataset.i=i;
+  b.setAttribute('aria-label', `${c.tipo} de ${c.data}`);
+  const tilt=((i*53)%9-4)+'deg';
+  b.innerHTML = c.tipo==='telegrama'
+    ? `<div class="peek telegram-peek" style="--tilt:${tilt}"><span class="tg-label">TELEGRAMA</span></div><span class="plate">${c.data}</span>`
+    : `<div class="peek" style="--tilt:${tilt}"><div class="mini-seal"></div></div><span class="plate">${c.data}</span>`;
+  b.onclick = ()=>openItem(i);
+  grid.appendChild(b);
+});
+const pb=document.createElement('button');
+pb.className='slot parcel-slot';
+pb.innerHTML=`<div class="peek"><div class="tag">para: ${CONFIG.ela} ♥</div></div><span class="plate">ENCOMENDA REGISTRADA</span>`;
+pb.onclick=openParcel;
+grid.appendChild(pb);
+
+function updateProgress(){
+  document.getElementById('progress').textContent =
+    `correspondências abertas: ${opened.size}/${CONFIG.cartas.length}`;
+}
+updateProgress();
+
+function closeOverlay(){
+  stageContent.querySelectorAll('video').forEach(v=>v.pause());
+  overlay.classList.remove('open'); stageContent.innerHTML='';
+}
+document.getElementById('close-x').onclick=closeOverlay;
+overlay.addEventListener('click', e=>{ if(e.target===overlay) closeOverlay(); });
+addEventListener('keydown', e=>{ if(e.key==='Escape') closeOverlay(); });
+
+/* ── envelope: lacre → aba → carta sobe → carta vem à frente ── */
+function openItem(i){
+  const c=CONFIG.cartas[i];
+  overlay.classList.add('open');
+  const isTg=c.tipo==='telegrama';
+  const scribbles=Array.from({length:6},()=>'<div class="scribble"></div>').join('');
+  stageContent.innerHTML=`
+    <div class="env-scene">
+      <div class="envelope" id="env">
+        <div class="env-back"></div>
+        <div class="letter-mini"><div class="greet">${CONFIG.ela},</div>${scribbles}</div>
+        <div class="env-front">
+          <div class="addr">
+            <div class="to">DESTINATÁRIA</div>
+            <div class="name">${CONFIG.ela}</div>
+            <div class="line"></div>
+          </div>
+          <div class="stamp-corner"><span>♥</span><small>5 ANOS</small></div>
+          <svg class="pm-mini" viewBox="0 0 74 74"><circle cx="37" cy="37" r="33"/><circle cx="37" cy="37" r="22"/></svg>
+        </div>
+        <div class="flap"><div class="front"></div><div class="back"></div></div>
+        <button class="seal" id="seal" aria-label="Segure para romper o lacre">
+          <svg class="ring" viewBox="0 0 114 114"><circle id="ring-c" cx="57" cy="57" r="54"/></svg>
+          <div class="emboss">${isTg?'!':(CONFIG.ela[0]||'♥')}</div>
+        </button>
+      </div>
+      <div class="hint">${isTg?'SEGURE O LACRE PARA RASGAR O TELEGRAMA':'SEGURE O LACRE DE CERA PARA ROMPÊ-LO'}</div>
+    </div>`;
+  setupSeal(c, ()=>{
+    const env=document.getElementById('env');
+    env.classList.add('opened');                       // aba abre
+    setTimeout(()=>env.classList.add('rising'), 650);  // carta sobe de dentro
+    setTimeout(()=>{
+      env.classList.add('away');                       // envelope se despede
+      setTimeout(()=>revealLetter(i), 500);            // carta vem à frente
+    }, 1750);
+  });
+}
+
+function setupSeal(c, onBreak){
+  const seal=document.getElementById('seal');
+  const ring=document.getElementById('ring-c');
+  const HOLD=850;
+  let t0=null, raf=null, done=false;
+  /* pré-carrega o vídeo enquanto ela segura o lacre */
+  if(c.video && !preloaded[c.video]){
+    const v=document.createElement('video');
+    v.src=c.video; v.preload='auto'; v.muted=true;
+    preloaded[c.video]=v;
+  }
+  function step(ts){
+    if(t0===null) t0=ts;
+    const p=Math.min(1,(ts-t0)/HOLD);
+    ring.style.strokeDashoffset=339*(1-p);
+    if(p>=1&&!done){ done=true; crack(); return; }
+    raf=requestAnimationFrame(step);
+  }
+  function start(e){ e.preventDefault(); if(done) return; t0=null; raf=requestAnimationFrame(step); }
+  function stop(){ if(done) return; cancelAnimationFrame(raf); t0=null; ring.style.strokeDashoffset=339; }
+  seal.addEventListener('pointerdown', start);
+  seal.addEventListener('pointerup', stop);
+  seal.addEventListener('pointerleave', stop);
+  seal.addEventListener('pointercancel', stop);
+  function crack(){
+    crackSound();
+    seal.classList.add('cracking');
+    const env=document.getElementById('env');
+    setTimeout(()=>{
+      const l=document.createElement('div'); l.className='seal-half l';
+      const r=document.createElement('div'); r.className='seal-half r';
+      env.appendChild(l); env.appendChild(r);
+      for(let k=0;k<7;k++){
+        const cr=document.createElement('div'); cr.className='crumb';
+        cr.style.left=(44+Math.random()*12)+'%'; cr.style.top='50%';
+        cr.style.setProperty('--cx',(Math.random()*120-60)+'px');
+        cr.style.animationDelay=(Math.random()*.15)+'s';
+        env.appendChild(cr);
+      }
+      seal.remove();
+      setTimeout(onBreak, 350);
+    }, 280);
+  }
+}
+
+/* ── carta completa (com filme) ── */
+function filmHTML(c, i){
+  if(c.video){
+    const poster=c.poster?`poster="${c.poster}"`:'';
+    return `
+      <div class="film">
+        <video src="${c.video}" ${poster} autoplay muted playsinline loop id="vid-${i}"></video>
+        <div class="grain-ov"></div><div class="vignette"></div>
+        <div class="reel-tag">BOBINA Nº ${String(i+1).padStart(2,'0')} · ${c.data}</div>
+        <div class="heart-rec">● REC ♥</div>
+        <button class="mute-btn" data-v="vid-${i}">🔇 ATIVAR SOM</button>
+      </div>`;
+  }
+  return `
+    <div class="film">
+      <div class="developing">
+        <div><div class="reel"></div>
+        <p>BOBINA Nº ${String(i+1).padStart(2,'0')} EM REVELAÇÃO<br>— em breve nesta agência —</p></div>
+      </div>
+      <div class="grain-ov"></div><div class="vignette"></div>
+    </div>`;
+}
+
+function revealLetter(i){
+  const c=CONFIG.cartas[i];
+  opened.add(i);
+  grid.children[i].classList.add('opened');
+  updateProgress();
+  const postmark=`
+    <svg class="postmark" viewBox="0 0 110 110">
+      <circle cx="55" cy="55" r="50" fill="none" stroke="var(--red-deep)" stroke-width="2.5"/>
+      <circle cx="55" cy="55" r="34" fill="none" stroke="var(--red-deep)" stroke-width="1.5"/>
+      <path id="pm-arc-${i}" d="M 55 12 A 43 43 0 1 1 54.9 12" fill="none"/>
+      <text font-size="11"><textPath href="#pm-arc-${i}" startOffset="4%">${c.cidade} ✦ CORREIO DOS APAIXONADOS ✦</textPath></text>
+      <text x="55" y="60" text-anchor="middle" font-size="11">${c.data}</text>
+    </svg>`;
+  if(c.tipo==='telegrama'){
+    stageContent.innerHTML=`
+      <div class="letter tg">
+        ${postmark}
+        <div class="tg-head"><b>TELEGRAMA</b><small>VIA CORAÇÃO · ${c.cidade}</small></div>
+        <div class="date-line">RECEBIDO EM: ${c.data} · TAXA: UM SORRISO</div>
+        ${filmHTML(c,i)}
+        <div class="body">${c.texto}</div>
+        <div class="ps">— ${CONFIG.ele}</div>
+      </div>`;
+  } else {
+    stageContent.innerHTML=`
+      <div class="letter">
+        ${postmark}
+        <div class="stamp2"><span>♥</span></div>
+        <div class="date-line">${c.cidade} · ${c.data}</div>
+        <h3>${c.titulo}</h3>
+        ${filmHTML(c,i)}
+        <div class="body">${c.texto}</div>
+        <div class="ps">${c.ps||''}<br>— ${CONFIG.ele}</div>
+        <div class="kiss">💋</div>
+      </div>`;
+  }
+  const mb=stageContent.querySelector('.mute-btn');
+  if(mb){
+    mb.onclick=()=>{
+      const v=document.getElementById(mb.dataset.v);
+      v.muted=!v.muted;
+      mb.textContent=v.muted?'🔇 ATIVAR SOM':'🔊 SOM LIGADO';
+    };
+  }
+}
+
+/* ── encomenda + assinatura ── */
+function openParcel(){
+  overlay.classList.add('open');
+  const remaining=CONFIG.cartas.length-opened.size;
+  const aviso=remaining>0
+    ? `<p style="font-family:'Special Elite',monospace;font-size:12px;letter-spacing:.1em;color:var(--red-deep)">
+        aviso do carteiro: ainda restam ${remaining} correspondência(s) no escaninho. mas quem manda aqui é você. ♥</p>`:'';
+  stageContent.innerHTML=`
+    <div class="parcel-card">
+      <h3>ENCOMENDA REGISTRADA Nº 5</h3>
+      <p>${CONFIG.encomenda.instrucao}</p>
+      ${aviso}
+      <div class="sig-zone">
+        <div class="lbl">ASSINATURA DA DESTINATÁRIA (${CONFIG.ela})</div>
+        <canvas id="sig" width="600" height="150"></canvas>
+        <div class="row">
+          <button id="sig-clear">LIMPAR</button>
+          <button id="sig-ok" disabled>CONFIRMAR RECEBIMENTO</button>
+        </div>
+      </div>
+    </div>`;
+  setupSignature();
+}
+function setupSignature(){
+  const cv=document.getElementById('sig');
+  const ctx=cv.getContext('2d');
+  const ok=document.getElementById('sig-ok');
+  let drawing=false, strokes=0;
+  ctx.lineWidth=3; ctx.lineCap='round'; ctx.strokeStyle='#6e1522';
+  function pos(e){
+    const r=cv.getBoundingClientRect();
+    return {x:(e.clientX-r.left)*(cv.width/r.width), y:(e.clientY-r.top)*(cv.height/r.height)};
+  }
+  cv.addEventListener('pointerdown', e=>{ drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e=>{ if(!drawing) return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); strokes++;
+    if(strokes>8) ok.disabled=false; });
+  cv.addEventListener('pointerup', ()=>drawing=false);
+  cv.addEventListener('pointercancel', ()=>drawing=false);
+  document.getElementById('sig-clear').onclick=()=>{ ctx.clearRect(0,0,cv.width,cv.height); strokes=0; ok.disabled=true; };
+  ok.onclick=openFinal;
+}
+function openFinal(){
+  const e=CONFIG.encomenda;
+  stageContent.innerHTML=`
+    <div class="final">
+      <div class="top">✦ CONTEÚDO DA ENCOMENDA ✦</div>
+      <h2>${e.titulo}</h2>
+      <div class="body">${e.mensagem}</div>
+      <div class="assin">com todo o amor, ${CONFIG.ele} ♥</div>
+      <div class="carimbo" id="carimbo">${e.carimbo}</div>
+    </div>`;
+  setTimeout(()=>{ document.getElementById('carimbo').classList.add('on'); stampSound(); }, 600);
+  heartRain();
+}
+
+/* ── efeitos ── */
+function heartRain(){
+  const glyphs=['♥','💌','💗','♥'];
+  for(let i=0;i<36;i++){
+    setTimeout(()=>{
+      const h=document.createElement('div');
+      h.className='heart-p'; h.textContent=glyphs[i%glyphs.length];
+      h.style.left=Math.random()*100+'vw';
+      h.style.fontSize=(14+Math.random()*20)+'px';
+      h.style.color=['#9c2233','#e77286','#c9973f'][i%3];
+      h.style.animationDuration=(2.6+Math.random()*2.4)+'s';
+      document.body.appendChild(h);
+      setTimeout(()=>h.remove(),5200);
+    }, i*130);
+  }
+}
+
+/* sons sintetizados (WebAudio, sem arquivos externos) */
+let actx=null;
+function audio(){ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+function crackSound(){
+  try{
+    const a=audio(), t=a.currentTime;
+    const buf=a.createBuffer(1,a.sampleRate*.14,a.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2.2);
+    const src=a.createBufferSource(); src.buffer=buf;
+    const f=a.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1400;
+    const g=a.createGain(); g.gain.setValueAtTime(.5,t);
+    src.connect(f).connect(g).connect(a.destination); src.start();
+  }catch(err){}
+}
+function creakSound(){
+  try{
+    const a=audio(), t=a.currentTime;
+    const o=a.createOscillator(), g=a.createGain();
+    o.type='sawtooth';
+    o.frequency.setValueAtTime(90,t);
+    o.frequency.linearRampToValueAtTime(160,t+.7);
+    o.frequency.linearRampToValueAtTime(70,t+1.2);
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(.05,t+.1);
+    g.gain.linearRampToValueAtTime(.02,t+.9);
+    g.gain.exponentialRampToValueAtTime(.001,t+1.3);
+    const f=a.createBiquadFilter(); f.type='bandpass'; f.frequency.value=300; f.Q.value=4;
+    o.connect(f).connect(g).connect(a.destination); o.start(t); o.stop(t+1.35);
+  }catch(err){}
+}
+function chime(){
+  try{
+    const a=audio(), t=a.currentTime;
+    [880,1174.7].forEach((fq,i)=>{
+      const o=a.createOscillator(), g=a.createGain();
+      o.frequency.value=fq; o.type='sine';
+      g.gain.setValueAtTime(0,t+i*.12);
+      g.gain.linearRampToValueAtTime(.18,t+i*.12+.02);
+      g.gain.exponentialRampToValueAtTime(.001,t+i*.12+1.4);
+      o.connect(g).connect(a.destination); o.start(t+i*.12); o.stop(t+i*.12+1.5);
+    });
+  }catch(err){}
+}
+function stampSound(){
+  try{
+    const a=audio(), t=a.currentTime;
+    const o=a.createOscillator(), g=a.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(140,t); o.frequency.exponentialRampToValueAtTime(50,t+.12);
+    g.gain.setValueAtTime(.6,t); g.gain.exponentialRampToValueAtTime(.001,t+.16);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t+.18);
+  }catch(err){}
+}
+</script>
+</body>
+</html>
