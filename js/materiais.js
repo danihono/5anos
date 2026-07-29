@@ -620,14 +620,59 @@ export function fachada({ semente = 1, andares = 5, tijolo = true, corBase = '#6
   });
 }
 
+/**
+ * Placa com texto, para o letreiro da agência. Sem isto o letreiro é uma barra
+ * dourada e a chegada perde a graça — o nome tem que estar legível, porque é
+ * o mesmo que está no site das cartas.
+ */
+export function placaTexto(linhas, { largura = 1024, altura = 256, corTexto = '#f8eeda',
+                                     corFundo = '#4a1219', fonte = 'Alfa Slab One' } = {}) {
+  return lembrado(`placa:${linhas.join('|')}:${corTexto}:${corFundo}`, () => {
+    const c = tela(largura, altura);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = corFundo;
+    ctx.fillRect(0, 0, largura, altura);
+
+    // filete dourado em volta
+    ctx.strokeStyle = '#c9973f';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(10, 10, largura - 20, altura - 20);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const alturaLinha = altura / (linhas.length + 0.6);
+    linhas.forEach((linha, i) => {
+      const tam = Math.round(alturaLinha * (linhas.length === 1 ? 0.62 : 0.72));
+      // a fonte pode não ter carregado; a serifa do sistema segura o texto
+      ctx.font = `${tam}px "${fonte}", Georgia, serif`;
+      ctx.fillStyle = corTexto;
+      const y = alturaLinha * (i + 0.8);
+      ctx.fillText(linha, largura / 2, y);
+    });
+
+    const t = texturaDe(c, { cor: true });
+    t.wrapS = t.wrapT = RepeatWrapping;
+    return { map: t };
+  });
+}
+
 /* ── céu e iluminação do ambiente ──────────────────────────────────────── */
 
+/*
+ * Projeção normal, e a abóbada é grande de verdade (raio ~450, dentro do plano
+ * distante da câmera).
+ *
+ * A primeira versão usava o truque de skybox `gl_Position = p.xyww` numa esfera
+ * de raio 1 em volta da câmera. Numa esfera que ENVOLVE a câmera metade dos
+ * vértices fica atrás dela, com w negativo, e forçar z=w faz a clipagem
+ * homogênea produzir buracos: a cena da noite ficava com um rasgo preto no
+ * meio do céu, medido em (0,0,0), enquanto as bordas apareciam normais.
+ */
 const VERT_CEU = `
 varying vec3 vDir;
 void main(){
   vDir = normalize(position);
-  vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  gl_Position = p.xyww;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
 const FRAG_CEU = `

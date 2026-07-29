@@ -311,7 +311,7 @@ export function iniciar() {
 
     if (fase.id === 'agencia') {
       agencia = criarAgencia();
-      agencia.grupo.position.set(0, 0, fase.comprimento + 10);
+      agencia.grupo.position.set(0, 0, fase.comprimento + 4);
       cena.add(agencia.grupo);
     }
 
@@ -327,7 +327,7 @@ export function iniciar() {
     u.forcaDof.value = preset.bloomNiveis > 0 ? (c.dof ?? 0.85) : 0;
     u.dofPerto.value = c.dofPerto ?? 14;
     u.dofLonge.value = c.dofLonge ?? 66;
-    u.contraste.value = c.contraste ?? 1.14;
+    u.contraste.value = c.contraste ?? 0.22;
     u.saturacao.value = c.saturacao ?? 1.18;
     u.veu.value = c.veu ?? 0.12;
     if (c.corAmbiente) u.corAmbiente.value = c.corAmbiente;
@@ -525,8 +525,20 @@ export function iniciar() {
 
   const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  /*
+   * O final é encenado em TEMPO DE JOGO, não em setTimeout. A volta da câmera
+   * até a fachada é calculada a partir de estado.tempoModo; se as legendas e o
+   * fade corressem no relógio de parede, num computador mais devagar o fade
+   * começaria com a câmera ainda no meio do movimento.
+   */
+  const MARCAS_FINAL = [
+    { t: 2.6, feito: false, faz: () => dizerLegenda('Onze cartas esperaram cinco anos por você.', 4200) },
+    { t: 7.2, feito: false, faz: () => { elFade.style.transitionDuration = '1.6s'; elFade.classList.add('on'); } },
+    { t: 9.2, feito: false, faz: () => irParaCartas() },
+  ];
+
   let finalIniciado = false;
-  async function encerrar() {
+  function encerrar() {
     if (finalIniciado) return;
     finalIniciado = true;
     estado.modo = 'final';
@@ -534,15 +546,15 @@ export function iniciar() {
     elHud.classList.remove('on');
     elEscapar.classList.remove('on');
     Som.sinetaDaPorta();
+  }
 
-    await esperar(2600);
-    dizerLegenda('Onze cartas esperaram cinco anos por você.', 4200);
-    await esperar(4600);
-
-    elFade.style.transitionDuration = '1.6s';
-    elFade.classList.add('on');
-    await esperar(1800);
-    irParaCartas();
+  function encenarFinal() {
+    for (const m of MARCAS_FINAL) {
+      if (!m.feito && estado.tempoModo >= m.t) {
+        m.feito = true;
+        m.faz();
+      }
+    }
   }
 
   function irParaCartas() {
@@ -624,13 +636,13 @@ export function iniciar() {
   function atualizarCamera(dt) {
     if (estado.modo === 'final' && estado.tempoModo > 0.4) {
       // a câmera dá a volta e enquadra a fachada
-      const t = suaveEntre(0.4, 4.2, estado.tempoModo);
-      const zFachada = fase.comprimento + 10;
-      const ax = mistura(estado.x * 0.62, -5.2, t);
-      const ay = mistura(camY, 2.4, t);
-      const az = mistura(estado.dist - 6.6, estado.dist + 7.4, t);
+      const t = suaveEntre(0.4, 5.2, estado.tempoModo);
+      const zFachada = fase.comprimento + 4;
+      const ax = mistura(estado.x * 0.62, -10.5, t);
+      const ay = mistura(camY, 3.4, t);
+      const az = mistura(estado.dist - 6.6, estado.dist - 12, t);
       camera.position.set(ax, ay, az);
-      alvoOlhar.set(mistura(estado.x * 0.35, 0, t), mistura(1.45, 4.2, t), mistura(estado.dist + 9, zFachada, t));
+      alvoOlhar.set(mistura(estado.x * 0.35, -1.6, t), mistura(1.45, 4.6, t), mistura(estado.dist + 9, zFachada, t));
       camera.lookAt(alvoOlhar);
       return;
     }
@@ -670,8 +682,9 @@ export function iniciar() {
     }
 
     if (estado.modo === 'final') {
+      encenarFinal();
       // desacelera até parar em frente à porta
-      const parada = fase.comprimento - 4;
+      const parada = fase.comprimento - 2;
       const restante = Math.max(0, parada - estado.dist);
       estado.velocidade = Math.min(estado.velocidade, restante * 0.8);
       estado.velocidade = Math.max(estado.velocidade, restante > 0.4 ? 1.1 : 0);

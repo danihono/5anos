@@ -74,12 +74,14 @@ function criarChao(fase, comprimento) {
     const lago = new Mesh(
       new PlaneGeometry(46, comprimento),
       new MeshPhysicalMaterial({
+        // espelho perfeito devolvia o céu creme e a água virava mais um
+        // pedaço de fundo; um pouco de aspereza e cor própria fazem ler água
         color: new Color(fase.corAgua || '#1b2a2e'),
-        roughness: 0.045, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.03,
+        roughness: 0.16, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.06,
       })
     );
     lago.rotation.x = -Math.PI / 2;
-    lago.position.set(-38, -0.02, 0);
+    lago.position.set(-38, 0.04, 0);
     g.add(lago);
     return g;
   }
@@ -453,7 +455,7 @@ function fazArvore(r, cores) {
   const alturaTronco = r.entre(2.2, 3.4);
   const tronco = new Mesh(
     new CylinderGeometry(0.18, 0.32, alturaTronco, 8),
-    new MeshStandardMaterial({ color: new Color('#4b3a2c'), roughness: 0.95 })
+    new MeshStandardMaterial({ color: new Color('#7d5c3c'), roughness: 0.9 })
   );
   tronco.position.y = alturaTronco / 2;
   tronco.castShadow = true;
@@ -584,6 +586,10 @@ function fazRodaGigante() {
  */
 export function criarAgencia() {
   const g = new Group();
+  /* Atenção à orientação: ela corre no sentido +Z e chega pela face -Z, então
+     TODO detalhe de frente (vitrine, porta, toldo, letreiro, coração) vive em z
+     negativo. Na primeira versão o toldo e o letreiro estavam em z positivo e
+     ficavam escondidos atrás do prédio na cutscene. */
   const VERMELHO = '#9c2233';
   const CREME = '#f8eeda';
   const LATAO = '#c9973f';
@@ -625,7 +631,7 @@ export function criarAgencia() {
   g.add(luzInterna);
 
   const portaLuz = new PointLight(new Color('#ffbb70'), 26, 22, 2);
-  portaLuz.position.set(0, 2.6, 1.6);
+  portaLuz.position.set(0, 2.6, -1.6);
   g.add(portaLuz);
 
   // toldo listrado, igual ao do CSS
@@ -637,29 +643,63 @@ export function criarAgencia() {
     faixa.castShadow = true;
     toldo.add(faixa);
   }
-  toldo.position.set(0, 5.2, 1.3);
-  toldo.rotation.x = 0.4;
+  toldo.position.set(0, 4.6, -1.5);
+  toldo.rotation.x = -0.42;
   g.add(toldo);
 
-  // letreiro
-  const placa = new Mesh(new BoxGeometry(9.5, 1.7, 0.3), new MeshStandardMaterial({
-    color: new Color('#4a1219'), roughness: 0.6,
+  // letreiro com o nome escrito — é o que faz a chegada valer
+  const textoPlaca = Mat.placaTexto(['AGÊNCIA Nº ♥', 'CORREIO DOS APAIXONADOS'], {
+    corTexto: LATAO, corFundo: '#4a1219',
+  });
+  const placa = new Mesh(new BoxGeometry(9.6, 2.4, 0.3), new MeshStandardMaterial({
+    map: textoPlaca.map,
+    emissiveMap: textoPlaca.map,
+    emissive: new Color('#ffffff'),
+    emissiveIntensity: 0.55,
+    roughness: 0.6,
   }));
-  placa.position.set(0, 7.1, 0.65);
+  placa.position.set(0, 6.6, -0.72);
   g.add(placa);
-  const letras = new Mesh(new BoxGeometry(8.6, 0.9, 0.12), new MeshStandardMaterial({
-    color: new Color(LATAO), emissive: new Color(LATAO),
-    emissiveIntensity: 2.8, roughness: 0.4, metalness: 0.6,
+
+  // dizeres do toldo, os mesmos do CSS
+  const textoToldo = Mat.placaTexto(['DESDE 2021 ✦ ENTREGAS AO CORAÇÃO'], {
+    largura: 1024, altura: 128, corTexto: CREME, corFundo: VERMELHO,
+  });
+  const faixaToldo = new Mesh(new BoxGeometry(9.4, 0.62, 0.08), new MeshStandardMaterial({
+    map: textoToldo.map, roughness: 0.7,
   }));
-  letras.position.set(0, 7.1, 0.83);
-  g.add(letras);
+  faixaToldo.position.set(0, 3.98, -2.42);
+  g.add(faixaToldo);
 
   const coracao = new Mesh(new SphereGeometry(0.36, 12, 10), new MeshStandardMaterial({
     color: new Color('#ff7a8c'), emissive: new Color('#ff3d5a'),
     emissiveIntensity: 4, roughness: 1,
   }));
-  coracao.position.set(0, 8.4, 0.8);
+  coracao.position.set(0, 8.1, -0.8);
   g.add(coracao);
+
+  // janelas acesas em cima: a parede de 11 m ficava uma laje vermelha chapada
+  const matJanela = new MeshStandardMaterial({
+    color: new Color('#ffd9a0'), emissive: new Color('#ffc470'),
+    emissiveIntensity: 1.7, roughness: 0.8,
+  });
+  const matCaixilho = new MeshStandardMaterial({ color: new Color(CREME), roughness: 0.7 });
+  for (const y of [8.1, 10.1]) {
+    for (const x of [-4.4, 4.4]) {
+      const cx = new Mesh(new BoxGeometry(1.9, 1.5, 0.1), matCaixilho);
+      cx.position.set(x, y, -0.63);
+      g.add(cx);
+      const j = new Mesh(new BoxGeometry(1.55, 1.15, 0.12), matJanela);
+      j.position.set(x, y, -0.66);
+      g.add(j);
+    }
+  }
+  // cornija coroando a fachada
+  const cornija = new Mesh(new BoxGeometry(14.8, 0.5, 2), matCaixilho);
+  cornija.position.set(0, 11.2, -0.4);
+  g.add(cornija);
+
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
   return { grupo: g, luz: portaLuz, coracao };
 }
@@ -744,7 +784,9 @@ export function criarMundo(cena, renderer, fase, preset) {
   cena.add(grupo);
 
   const ceu = Mat.criarCeu(renderer, fase.paleta);
-  ceu.malha.scale.setScalar(1);
+  // raio grande: dentro do plano distante (600) e imune ao atraso de um quadro
+  // no acompanhamento da câmera
+  ceu.malha.scale.setScalar(450);
   cena.add(ceu.malha);
   cena.environment = ceu.ambiente;
 

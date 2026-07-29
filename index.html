@@ -1325,14 +1325,59 @@ function fachada({ semente = 1, andares = 5, tijolo = true, corBase = '#6b4a3e',
   });
 }
 
+/**
+ * Placa com texto, para o letreiro da agência. Sem isto o letreiro é uma barra
+ * dourada e a chegada perde a graça — o nome tem que estar legível, porque é
+ * o mesmo que está no site das cartas.
+ */
+function placaTexto(linhas, { largura = 1024, altura = 256, corTexto = '#f8eeda',
+                                     corFundo = '#4a1219', fonte = 'Alfa Slab One' } = {}) {
+  return lembrado(`placa:${linhas.join('|')}:${corTexto}:${corFundo}`, () => {
+    const c = tela(largura, altura);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = corFundo;
+    ctx.fillRect(0, 0, largura, altura);
+
+    // filete dourado em volta
+    ctx.strokeStyle = '#c9973f';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(10, 10, largura - 20, altura - 20);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const alturaLinha = altura / (linhas.length + 0.6);
+    linhas.forEach((linha, i) => {
+      const tam = Math.round(alturaLinha * (linhas.length === 1 ? 0.62 : 0.72));
+      // a fonte pode não ter carregado; a serifa do sistema segura o texto
+      ctx.font = `${tam}px "${fonte}", Georgia, serif`;
+      ctx.fillStyle = corTexto;
+      const y = alturaLinha * (i + 0.8);
+      ctx.fillText(linha, largura / 2, y);
+    });
+
+    const t = texturaDe(c, { cor: true });
+    t.wrapS = t.wrapT = RepeatWrapping;
+    return { map: t };
+  });
+}
+
 /* ── céu e iluminação do ambiente ──────────────────────────────────────── */
 
+/*
+ * Projeção normal, e a abóbada é grande de verdade (raio ~450, dentro do plano
+ * distante da câmera).
+ *
+ * A primeira versão usava o truque de skybox `gl_Position = p.xyww` numa esfera
+ * de raio 1 em volta da câmera. Numa esfera que ENVOLVE a câmera metade dos
+ * vértices fica atrás dela, com w negativo, e forçar z=w faz a clipagem
+ * homogênea produzir buracos: a cena da noite ficava com um rasgo preto no
+ * meio do céu, medido em (0,0,0), enquanto as bordas apareciam normais.
+ */
 const VERT_CEU = `
 varying vec3 vDir;
 void main(){
   vDir = normalize(position);
-  vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  gl_Position = p.xyww;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
 const FRAG_CEU = `
@@ -1400,7 +1445,7 @@ function criarCeu(renderer, paleta) {
   return { malha, ambiente: alvo.texture, uniforms, alvo };
 }
 
-return { limparCache, caixaArredondada, asfalto, calcada, paralelepipedo, grama, fachada, criarCeu };
+return { limparCache, caixaArredondada, asfalto, calcada, paralelepipedo, grama, fachada, placaTexto, criarCeu };
 })();
 
 /* ── js/pos.js ── */
@@ -1562,10 +1607,15 @@ void main(){
   cor *= exposicao;
   cor = aces(cor);
 
-  /* Acabamento de ilustração: sem isto o mundo pastel vira leitoso. A curva
-     em S devolve o pretinho e o branquinho, e a saturação devolve a cor que
-     o tonemap come. É a diferença entre "desbotado" e "desenho bonito". */
-  cor = clamp((cor - 0.5) * contraste + 0.5, 0.0, 1.0);
+  /* Acabamento de ilustração: sem isto o mundo pastel vira leitoso.
+
+     A curva tem que ser em S de verdade (smoothstep), e não uma reta girada
+     em volta de 0,5. Com a reta e contraste 1,2 tudo abaixo de 0,083 vira
+     preto puro — foi assim que o céu noturno da última cena ficou totalmente
+     preto, brigando com a neblina lilás. O smoothstep mapeia 0→0 e 1→1,
+     então adiciona contraste no meio sem nunca cortar as pontas. */
+  vec3 emS = cor * cor * (3.0 - 2.0 * cor);
+  cor = mix(cor, emS, contraste);
   float luma = dot(cor, vec3(0.2126, 0.7152, 0.0722));
   cor = clamp(mix(vec3(luma), cor, saturacao), 0.0, 1.0);
   cor = mix(cor, cor * corAmbiente, veu);
@@ -1651,7 +1701,7 @@ function criarPos(renderer, cena, camera, opts = {}) {
         vinheta: { value: opts.vinheta ?? 0.55 },
         grao: { value: opts.grao ?? 0.035 },
         aberracao: { value: opts.aberracao ?? 0.0016 },
-        contraste: { value: opts.contraste ?? 1.14 },
+        contraste: { value: opts.contraste ?? 0.22 },
         saturacao: { value: opts.saturacao ?? 1.18 },
         veu: { value: opts.veu ?? 0.12 },
         corAmbiente: { value: opts.corAmbiente ?? [1.03, 1.0, 0.95] },
@@ -2629,12 +2679,14 @@ function criarChao(fase, comprimento) {
     const lago = new Mesh(
       new PlaneGeometry(46, comprimento),
       new MeshPhysicalMaterial({
+        // espelho perfeito devolvia o céu creme e a água virava mais um
+        // pedaço de fundo; um pouco de aspereza e cor própria fazem ler água
         color: new Color(fase.corAgua || '#1b2a2e'),
-        roughness: 0.045, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.03,
+        roughness: 0.16, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.06,
       })
     );
     lago.rotation.x = -Math.PI / 2;
-    lago.position.set(-38, -0.02, 0);
+    lago.position.set(-38, 0.04, 0);
     g.add(lago);
     return g;
   }
@@ -3008,7 +3060,7 @@ function fazArvore(r, cores) {
   const alturaTronco = r.entre(2.2, 3.4);
   const tronco = new Mesh(
     new CylinderGeometry(0.18, 0.32, alturaTronco, 8),
-    new MeshStandardMaterial({ color: new Color('#4b3a2c'), roughness: 0.95 })
+    new MeshStandardMaterial({ color: new Color('#7d5c3c'), roughness: 0.9 })
   );
   tronco.position.y = alturaTronco / 2;
   tronco.castShadow = true;
@@ -3139,6 +3191,10 @@ function fazRodaGigante() {
  */
 function criarAgencia() {
   const g = new Group();
+  /* Atenção à orientação: ela corre no sentido +Z e chega pela face -Z, então
+     TODO detalhe de frente (vitrine, porta, toldo, letreiro, coração) vive em z
+     negativo. Na primeira versão o toldo e o letreiro estavam em z positivo e
+     ficavam escondidos atrás do prédio na cutscene. */
   const VERMELHO = '#9c2233';
   const CREME = '#f8eeda';
   const LATAO = '#c9973f';
@@ -3180,7 +3236,7 @@ function criarAgencia() {
   g.add(luzInterna);
 
   const portaLuz = new PointLight(new Color('#ffbb70'), 26, 22, 2);
-  portaLuz.position.set(0, 2.6, 1.6);
+  portaLuz.position.set(0, 2.6, -1.6);
   g.add(portaLuz);
 
   // toldo listrado, igual ao do CSS
@@ -3192,29 +3248,63 @@ function criarAgencia() {
     faixa.castShadow = true;
     toldo.add(faixa);
   }
-  toldo.position.set(0, 5.2, 1.3);
-  toldo.rotation.x = 0.4;
+  toldo.position.set(0, 4.6, -1.5);
+  toldo.rotation.x = -0.42;
   g.add(toldo);
 
-  // letreiro
-  const placa = new Mesh(new BoxGeometry(9.5, 1.7, 0.3), new MeshStandardMaterial({
-    color: new Color('#4a1219'), roughness: 0.6,
+  // letreiro com o nome escrito — é o que faz a chegada valer
+  const textoPlaca = Mat.placaTexto(['AGÊNCIA Nº ♥', 'CORREIO DOS APAIXONADOS'], {
+    corTexto: LATAO, corFundo: '#4a1219',
+  });
+  const placa = new Mesh(new BoxGeometry(9.6, 2.4, 0.3), new MeshStandardMaterial({
+    map: textoPlaca.map,
+    emissiveMap: textoPlaca.map,
+    emissive: new Color('#ffffff'),
+    emissiveIntensity: 0.55,
+    roughness: 0.6,
   }));
-  placa.position.set(0, 7.1, 0.65);
+  placa.position.set(0, 6.6, -0.72);
   g.add(placa);
-  const letras = new Mesh(new BoxGeometry(8.6, 0.9, 0.12), new MeshStandardMaterial({
-    color: new Color(LATAO), emissive: new Color(LATAO),
-    emissiveIntensity: 2.8, roughness: 0.4, metalness: 0.6,
+
+  // dizeres do toldo, os mesmos do CSS
+  const textoToldo = Mat.placaTexto(['DESDE 2021 ✦ ENTREGAS AO CORAÇÃO'], {
+    largura: 1024, altura: 128, corTexto: CREME, corFundo: VERMELHO,
+  });
+  const faixaToldo = new Mesh(new BoxGeometry(9.4, 0.62, 0.08), new MeshStandardMaterial({
+    map: textoToldo.map, roughness: 0.7,
   }));
-  letras.position.set(0, 7.1, 0.83);
-  g.add(letras);
+  faixaToldo.position.set(0, 3.98, -2.42);
+  g.add(faixaToldo);
 
   const coracao = new Mesh(new SphereGeometry(0.36, 12, 10), new MeshStandardMaterial({
     color: new Color('#ff7a8c'), emissive: new Color('#ff3d5a'),
     emissiveIntensity: 4, roughness: 1,
   }));
-  coracao.position.set(0, 8.4, 0.8);
+  coracao.position.set(0, 8.1, -0.8);
   g.add(coracao);
+
+  // janelas acesas em cima: a parede de 11 m ficava uma laje vermelha chapada
+  const matJanela = new MeshStandardMaterial({
+    color: new Color('#ffd9a0'), emissive: new Color('#ffc470'),
+    emissiveIntensity: 1.7, roughness: 0.8,
+  });
+  const matCaixilho = new MeshStandardMaterial({ color: new Color(CREME), roughness: 0.7 });
+  for (const y of [8.1, 10.1]) {
+    for (const x of [-4.4, 4.4]) {
+      const cx = new Mesh(new BoxGeometry(1.9, 1.5, 0.1), matCaixilho);
+      cx.position.set(x, y, -0.63);
+      g.add(cx);
+      const j = new Mesh(new BoxGeometry(1.55, 1.15, 0.12), matJanela);
+      j.position.set(x, y, -0.66);
+      g.add(j);
+    }
+  }
+  // cornija coroando a fachada
+  const cornija = new Mesh(new BoxGeometry(14.8, 0.5, 2), matCaixilho);
+  cornija.position.set(0, 11.2, -0.4);
+  g.add(cornija);
+
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
   return { grupo: g, luz: portaLuz, coracao };
 }
@@ -3299,7 +3389,9 @@ function criarMundo(cena, renderer, fase, preset) {
   cena.add(grupo);
 
   const ceu = Mat.criarCeu(renderer, fase.paleta);
-  ceu.malha.scale.setScalar(1);
+  // raio grande: dentro do plano distante (600) e imune ao atraso de um quadro
+  // no acompanhamento da câmera
+  ceu.malha.scale.setScalar(450);
   cena.add(ceu.malha);
   cena.environment = ceu.ambiente;
 
@@ -3656,7 +3748,7 @@ const FASES = [
     padroes: PADROES_RUA,
     camera: { exposicao: 0.94, bloom: 0.5, vinheta: 0.3, grao: 0.004, gotas: 0.5, aberracao: 0,
                dof: 0.8, dofPerto: 26, dofLonge: 140,
-               contraste: 1.16, saturacao: 1.22, veu: 0.1 },
+               contraste: 0.24, saturacao: 1.2, veu: 0.1 },
     som: { chuva: 1, vento: 0.5, acorde: [130.81, 196, 246.94] },
   },
 
@@ -3688,7 +3780,7 @@ const FASES = [
     chuva: 0.12, corChuva: '#ffe4c0', vento: [-0.5, 0],
     molhado: 0.8, pedra: false,
     coresFolhagem: ['#b4671f', '#c98a2a', '#8c4f1c', '#6f7a2a', '#a8551a', '#d19a34'],
-    corAgua: '#27424a',
+    corAgua: '#5aa3b4',
 
     coresPredio: ['#7a6a58'],
     janelasAcesas: 0, lojas: false,
@@ -3698,7 +3790,7 @@ const FASES = [
     padroes: PADROES_PARQUE,
     camera: { exposicao: 0.9, bloom: 0.6, vinheta: 0.26, grao: 0.004, gotas: 0.14, aberracao: 0,
                dof: 0.82, dofPerto: 28, dofLonge: 150,
-               contraste: 1.14, saturacao: 1.26, veu: 0.14, corAmbiente: [1.05, 1.0, 0.92] },
+               contraste: 0.2, saturacao: 1.24, veu: 0.14, corAmbiente: [1.05, 1.0, 0.92] },
     som: { chuva: 0.18, vento: 0.75, acorde: [174.61, 261.63, 329.63] },
   },
 
@@ -3740,7 +3832,7 @@ const FASES = [
     padroes: PADROES_NOITE,
     camera: { exposicao: 1.05, bloom: 0.85, vinheta: 0.38, grao: 0.005, gotas: 0.42, aberracao: 0,
                dof: 0.85, dofPerto: 22, dofLonge: 120,
-               contraste: 1.2, saturacao: 1.2, veu: 0.16, corAmbiente: [0.98, 0.99, 1.06] },
+               contraste: 0.3, saturacao: 1.18, veu: 0.16, corAmbiente: [0.98, 0.99, 1.06] },
     som: { chuva: 0.6, vento: 0.4, acorde: [110, 164.81, 220] },
   },
 ];
@@ -4156,7 +4248,7 @@ function iniciar() {
 
     if (fase.id === 'agencia') {
       agencia = criarAgencia();
-      agencia.grupo.position.set(0, 0, fase.comprimento + 10);
+      agencia.grupo.position.set(0, 0, fase.comprimento + 4);
       cena.add(agencia.grupo);
     }
 
@@ -4172,7 +4264,7 @@ function iniciar() {
     u.forcaDof.value = preset.bloomNiveis > 0 ? (c.dof ?? 0.85) : 0;
     u.dofPerto.value = c.dofPerto ?? 14;
     u.dofLonge.value = c.dofLonge ?? 66;
-    u.contraste.value = c.contraste ?? 1.14;
+    u.contraste.value = c.contraste ?? 0.22;
     u.saturacao.value = c.saturacao ?? 1.18;
     u.veu.value = c.veu ?? 0.12;
     if (c.corAmbiente) u.corAmbiente.value = c.corAmbiente;
@@ -4370,8 +4462,20 @@ function iniciar() {
 
   const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  /*
+   * O final é encenado em TEMPO DE JOGO, não em setTimeout. A volta da câmera
+   * até a fachada é calculada a partir de estado.tempoModo; se as legendas e o
+   * fade corressem no relógio de parede, num computador mais devagar o fade
+   * começaria com a câmera ainda no meio do movimento.
+   */
+  const MARCAS_FINAL = [
+    { t: 2.6, feito: false, faz: () => dizerLegenda('Onze cartas esperaram cinco anos por você.', 4200) },
+    { t: 7.2, feito: false, faz: () => { elFade.style.transitionDuration = '1.6s'; elFade.classList.add('on'); } },
+    { t: 9.2, feito: false, faz: () => irParaCartas() },
+  ];
+
   let finalIniciado = false;
-  async function encerrar() {
+  function encerrar() {
     if (finalIniciado) return;
     finalIniciado = true;
     estado.modo = 'final';
@@ -4379,15 +4483,15 @@ function iniciar() {
     elHud.classList.remove('on');
     elEscapar.classList.remove('on');
     Som.sinetaDaPorta();
+  }
 
-    await esperar(2600);
-    dizerLegenda('Onze cartas esperaram cinco anos por você.', 4200);
-    await esperar(4600);
-
-    elFade.style.transitionDuration = '1.6s';
-    elFade.classList.add('on');
-    await esperar(1800);
-    irParaCartas();
+  function encenarFinal() {
+    for (const m of MARCAS_FINAL) {
+      if (!m.feito && estado.tempoModo >= m.t) {
+        m.feito = true;
+        m.faz();
+      }
+    }
   }
 
   function irParaCartas() {
@@ -4469,13 +4573,13 @@ function iniciar() {
   function atualizarCamera(dt) {
     if (estado.modo === 'final' && estado.tempoModo > 0.4) {
       // a câmera dá a volta e enquadra a fachada
-      const t = suaveEntre(0.4, 4.2, estado.tempoModo);
-      const zFachada = fase.comprimento + 10;
-      const ax = mistura(estado.x * 0.62, -5.2, t);
-      const ay = mistura(camY, 2.4, t);
-      const az = mistura(estado.dist - 6.6, estado.dist + 7.4, t);
+      const t = suaveEntre(0.4, 5.2, estado.tempoModo);
+      const zFachada = fase.comprimento + 4;
+      const ax = mistura(estado.x * 0.62, -10.5, t);
+      const ay = mistura(camY, 3.4, t);
+      const az = mistura(estado.dist - 6.6, estado.dist - 12, t);
       camera.position.set(ax, ay, az);
-      alvoOlhar.set(mistura(estado.x * 0.35, 0, t), mistura(1.45, 4.2, t), mistura(estado.dist + 9, zFachada, t));
+      alvoOlhar.set(mistura(estado.x * 0.35, -1.6, t), mistura(1.45, 4.6, t), mistura(estado.dist + 9, zFachada, t));
       camera.lookAt(alvoOlhar);
       return;
     }
@@ -4515,8 +4619,9 @@ function iniciar() {
     }
 
     if (estado.modo === 'final') {
+      encenarFinal();
       // desacelera até parar em frente à porta
-      const parada = fase.comprimento - 4;
+      const parada = fase.comprimento - 2;
       const restante = Math.max(0, parada - estado.dist);
       estado.velocidade = Math.min(estado.velocidade, restante * 0.8);
       estado.velocidade = Math.max(estado.velocidade, restante > 0.4 ? 1.1 : 0);

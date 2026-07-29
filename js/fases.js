@@ -103,7 +103,7 @@ export const FASES = [
     padroes: PADROES_RUA,
     camera: { exposicao: 0.94, bloom: 0.5, vinheta: 0.3, grao: 0.004, gotas: 0.5, aberracao: 0,
                dof: 0.8, dofPerto: 26, dofLonge: 140,
-               contraste: 1.16, saturacao: 1.22, veu: 0.1 },
+               contraste: 0.24, saturacao: 1.2, veu: 0.1 },
     som: { chuva: 1, vento: 0.5, acorde: [130.81, 196, 246.94] },
   },
 
@@ -135,7 +135,7 @@ export const FASES = [
     chuva: 0.12, corChuva: '#ffe4c0', vento: [-0.5, 0],
     molhado: 0.8, pedra: false,
     coresFolhagem: ['#b4671f', '#c98a2a', '#8c4f1c', '#6f7a2a', '#a8551a', '#d19a34'],
-    corAgua: '#27424a',
+    corAgua: '#5aa3b4',
 
     coresPredio: ['#7a6a58'],
     janelasAcesas: 0, lojas: false,
@@ -145,7 +145,7 @@ export const FASES = [
     padroes: PADROES_PARQUE,
     camera: { exposicao: 0.9, bloom: 0.6, vinheta: 0.26, grao: 0.004, gotas: 0.14, aberracao: 0,
                dof: 0.82, dofPerto: 28, dofLonge: 150,
-               contraste: 1.14, saturacao: 1.26, veu: 0.14, corAmbiente: [1.05, 1.0, 0.92] },
+               contraste: 0.2, saturacao: 1.24, veu: 0.14, corAmbiente: [1.05, 1.0, 0.92] },
     som: { chuva: 0.18, vento: 0.75, acorde: [174.61, 261.63, 329.63] },
   },
 
@@ -187,7 +187,7 @@ export const FASES = [
     padroes: PADROES_NOITE,
     camera: { exposicao: 1.05, bloom: 0.85, vinheta: 0.38, grao: 0.005, gotas: 0.42, aberracao: 0,
                dof: 0.85, dofPerto: 22, dofLonge: 120,
-               contraste: 1.2, saturacao: 1.2, veu: 0.16, corAmbiente: [0.98, 0.99, 1.06] },
+               contraste: 0.3, saturacao: 1.18, veu: 0.16, corAmbiente: [0.98, 0.99, 1.06] },
     som: { chuva: 0.6, vento: 0.4, acorde: [110, 164.81, 220] },
   },
 ];

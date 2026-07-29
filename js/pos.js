@@ -158,10 +158,15 @@ void main(){
   cor *= exposicao;
   cor = aces(cor);
 
-  /* Acabamento de ilustração: sem isto o mundo pastel vira leitoso. A curva
-     em S devolve o pretinho e o branquinho, e a saturação devolve a cor que
-     o tonemap come. É a diferença entre "desbotado" e "desenho bonito". */
-  cor = clamp((cor - 0.5) * contraste + 0.5, 0.0, 1.0);
+  /* Acabamento de ilustração: sem isto o mundo pastel vira leitoso.
+
+     A curva tem que ser em S de verdade (smoothstep), e não uma reta girada
+     em volta de 0,5. Com a reta e contraste 1,2 tudo abaixo de 0,083 vira
+     preto puro — foi assim que o céu noturno da última cena ficou totalmente
+     preto, brigando com a neblina lilás. O smoothstep mapeia 0→0 e 1→1,
+     então adiciona contraste no meio sem nunca cortar as pontas. */
+  vec3 emS = cor * cor * (3.0 - 2.0 * cor);
+  cor = mix(cor, emS, contraste);
   float luma = dot(cor, vec3(0.2126, 0.7152, 0.0722));
   cor = clamp(mix(vec3(luma), cor, saturacao), 0.0, 1.0);
   cor = mix(cor, cor * corAmbiente, veu);
@@ -247,7 +252,7 @@ export function criarPos(renderer, cena, camera, opts = {}) {
         vinheta: { value: opts.vinheta ?? 0.55 },
         grao: { value: opts.grao ?? 0.035 },
         aberracao: { value: opts.aberracao ?? 0.0016 },
-        contraste: { value: opts.contraste ?? 1.14 },
+        contraste: { value: opts.contraste ?? 0.22 },
         saturacao: { value: opts.saturacao ?? 1.18 },
         veu: { value: opts.veu ?? 0.12 },
         corAmbiente: { value: opts.corAmbiente ?? [1.03, 1.0, 0.95] },
