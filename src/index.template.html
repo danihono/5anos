@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f14">
+<title>Londres — 5 anos ♥</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Pinyon+Script&family=Special+Elite&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#9c2233; --red-deep:#6e1522;
+    --cream:#f8eeda; --brass:#c9973f; --brass-hi:#ecd08a;
+    --ink:#3c2a28; --noite:#0d0f14;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--noite);
+    font-family:'Cormorant Garamond',Georgia,serif;color:var(--cream);
+    -webkit-tap-highlight-color:transparent}
+  body{touch-action:none;user-select:none;-webkit-user-select:none}
+  canvas{display:block;width:100%;height:100%}
+  button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+
+  #tela{position:fixed;inset:0;z-index:1}
+
+  /* ───────── camadas de interface ───────── */
+  .camada{position:fixed;inset:0;display:grid;place-items:center;z-index:20;
+    padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom))}
+  .camada[hidden]{display:none}
+
+  /* ───────── carregando ───────── */
+  #carregando{background:radial-gradient(1200px 800px at 50% 40%,#1b2029,#07080b 70%);z-index:60}
+  #carregando .caixa{text-align:center;max-width:520px}
+  .selo{font-family:'Alfa Slab One',serif;font-size:clamp(30px,7vw,54px);letter-spacing:.02em;
+    color:var(--cream);text-shadow:0 3px 0 rgba(0,0,0,.5),0 0 40px rgba(201,151,63,.25)}
+  .risca{width:120px;height:2px;margin:18px auto;background:linear-gradient(90deg,transparent,var(--brass),transparent)}
+  #barra{width:min(320px,72vw);height:3px;margin:0 auto;background:rgba(248,238,218,.14);border-radius:3px;overflow:hidden}
+  #barra i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--brass),var(--brass-hi));
+    transition:width .3s ease}
+  #carregando p{margin-top:14px;font-family:'Special Elite',monospace;font-size:12px;
+    letter-spacing:.18em;text-transform:uppercase;opacity:.55}
+
+  /* ───────── intro ───────── */
+  #intro{background:linear-gradient(180deg,rgba(7,8,11,.82),rgba(7,8,11,.55) 40%,rgba(7,8,11,.9));
+    backdrop-filter:blur(3px);z-index:50}
+  #intro .caixa{text-align:center;max-width:600px}
+  #intro .sobre{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.32em;
+    text-transform:uppercase;color:var(--brass);opacity:.85;margin-bottom:10px}
+  #intro h1{font-family:'Alfa Slab One',serif;font-size:clamp(34px,9vw,74px);line-height:.98;
+    text-shadow:0 4px 0 rgba(0,0,0,.55),0 0 60px rgba(156,34,51,.5)}
+  #intro .conto{font-size:clamp(16px,3.4vw,21px);line-height:1.55;margin:16px auto 4px;max-width:34em;
+    color:rgba(248,238,218,.86);font-style:italic}
+  .botao{display:inline-block;margin-top:22px;padding:14px 34px;border-radius:2px;
+    font-family:'Special Elite',monospace;font-size:14px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--cream);background:linear-gradient(180deg,var(--red),var(--red-deep));
+    box-shadow:0 6px 0 #4a0d17,0 12px 26px rgba(0,0,0,.5);transition:transform .12s,box-shadow .12s}
+  .botao:hover{transform:translateY(-2px);box-shadow:0 8px 0 #4a0d17,0 16px 30px rgba(0,0,0,.55)}
+  .botao:active{transform:translateY(4px);box-shadow:0 2px 0 #4a0d17,0 6px 14px rgba(0,0,0,.5)}
+  .teclas{margin-top:26px;display:flex;gap:10px 22px;justify-content:center;flex-wrap:wrap;
+    font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.1em;opacity:.62}
+  .teclas b{display:inline-block;min-width:26px;padding:3px 7px;margin-right:6px;border-radius:3px;
+    background:rgba(248,238,218,.1);border:1px solid rgba(248,238,218,.22);font-weight:400}
+  .pular{margin-top:28px;font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;color:rgba(248,238,218,.42);text-decoration:underline;
+    text-underline-offset:5px;transition:color .2s}
+  .pular:hover{color:var(--brass-hi)}
+
+  /* ───────── HUD ───────── */
+  #hud{position:fixed;inset:0;z-index:15;pointer-events:none;
+    padding:max(16px,env(safe-area-inset-top)) 18px 0;
+    opacity:0;transition:opacity .6s ease}
+  #hud.on{opacity:1}
+  #coracoes{position:absolute;top:max(16px,env(safe-area-inset-top));left:18px;display:flex;gap:7px}
+  .cor{width:24px;height:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6));
+    transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .35s}
+  .cor.off{opacity:.22;transform:scale(.7)}
+  .cor.bate{animation:batida .45s ease}
+  @keyframes batida{0%,100%{transform:scale(1)}35%{transform:scale(1.5)}}
+
+  /* trilha até a porta — fina e discreta, como na referência */
+  #trilha{position:absolute;top:calc(max(16px,env(safe-area-inset-top)) + 40px);left:18px;
+    width:min(190px,42vw);font-family:'Special Elite',monospace}
+  #trilha .rot{font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+    color:rgba(248,238,218,.55);text-shadow:0 1px 3px rgba(0,0,0,.5);margin-bottom:5px}
+  #trilha .barra{height:2px;background:rgba(248,238,218,.22);border-radius:2px;overflow:hidden}
+  #trilha .barra i{display:block;height:100%;width:0%;border-radius:2px;
+    background:linear-gradient(90deg,var(--brass),var(--brass-hi));transition:width .4s linear}
+  #trilha .pct{margin-top:4px;font-size:10px;letter-spacing:.1em;color:var(--brass-hi);
+    text-shadow:0 1px 3px rgba(0,0,0,.5)}
+
+  #bolsa{position:absolute;top:max(16px,env(safe-area-inset-top));right:18px;text-align:right;
+    font-family:'Special Elite',monospace}
+  #bolsa .n{font-size:19px;color:var(--brass-hi);text-shadow:0 2px 6px rgba(0,0,0,.7)}
+  #bolsa .r{font-size:9px;letter-spacing:.2em;text-transform:uppercase;opacity:.5;margin-top:2px}
+
+  #titulo-fase{position:absolute;left:0;right:0;top:32%;text-align:center;opacity:0}
+  #titulo-fase .n{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.4em;
+    text-transform:uppercase;color:var(--brass);margin-bottom:8px}
+  #titulo-fase .t{font-family:'Alfa Slab One',serif;font-size:clamp(24px,5.5vw,44px);
+    text-shadow:0 3px 0 rgba(0,0,0,.5),0 0 50px rgba(0,0,0,.8)}
+  #titulo-fase.mostra{animation:cartela 4s ease forwards}
+  @keyframes cartela{0%{opacity:0;transform:translateY(14px)}18%,68%{opacity:1;transform:none}
+    100%{opacity:0;transform:translateY(-10px)}}
+
+  /* aviso de carta coletada */
+  #achados{position:absolute;right:18px;top:calc(max(16px,env(safe-area-inset-top)) + 46px);
+    display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .achado{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.14em;
+    color:var(--brass-hi);text-shadow:0 2px 6px rgba(0,0,0,.8);animation:sobe 2.4s ease forwards}
+  @keyframes sobe{0%{opacity:0;transform:translateY(10px) scale(.9)}
+    14%{opacity:1;transform:none}70%{opacity:1}100%{opacity:0;transform:translateY(-18px)}}
+
+  /* ───────── recados no meio da tela ───────── */
+  #recado{position:fixed;inset:0;z-index:18;display:grid;place-items:center;pointer-events:none}
+  #recado .cx{text-align:center;padding:26px 34px;border-radius:3px;pointer-events:auto;
+    background:rgba(9,10,14,.82);border:1px solid rgba(201,151,63,.26);
+    box-shadow:0 20px 60px rgba(0,0,0,.6);backdrop-filter:blur(6px);
+    max-width:min(480px,88vw);opacity:0;transform:translateY(10px);transition:opacity .35s,transform .35s}
+  #recado.on .cx{opacity:1;transform:none}
+  #recado h3{font-family:'Alfa Slab One',serif;font-size:clamp(19px,4.5vw,28px);margin-bottom:8px}
+  #recado p{font-size:clamp(15px,3.2vw,18px);line-height:1.5;color:rgba(248,238,218,.8);font-style:italic}
+  #recado .acoes{margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .mini{padding:9px 20px;border-radius:2px;font-family:'Special Elite',monospace;font-size:11px;
+    letter-spacing:.16em;text-transform:uppercase;border:1px solid rgba(248,238,218,.28);
+    color:rgba(248,238,218,.8);transition:all .18s}
+  .mini:hover{background:rgba(248,238,218,.1);color:var(--cream);border-color:var(--brass)}
+  .mini.forte{background:linear-gradient(180deg,var(--red),var(--red-deep));border-color:transparent;
+    color:var(--cream);box-shadow:0 4px 0 #4a0d17}
+  .mini.forte:hover{background:linear-gradient(180deg,#b3273b,#7d1826)}
+
+  /* ───────── pausa ───────── */
+  #pausa{background:rgba(7,8,11,.8);backdrop-filter:blur(5px);z-index:40}
+  #pausa .caixa{text-align:center}
+  #pausa h2{font-family:'Alfa Slab One',serif;font-size:clamp(26px,6vw,40px);margin-bottom:22px}
+  .linha{display:flex;gap:10px;justify-content:center;align-items:center;margin:12px 0;flex-wrap:wrap}
+  .rot{font-family:'Special Elite',monospace;font-size:10px;letter-spacing:.2em;
+    text-transform:uppercase;opacity:.5;margin-right:6px}
+  .mini.sel{border-color:var(--brass);color:var(--brass-hi);background:rgba(201,151,63,.12)}
+
+  /* ───────── legenda da cutscene ───────── */
+  #legenda{position:fixed;left:0;right:0;bottom:14%;z-index:22;text-align:center;pointer-events:none;
+    opacity:0;transition:opacity 1s ease;padding:0 24px}
+  #legenda.on{opacity:1}
+  #legenda span{font-family:'Pinyon Script',cursive;font-size:clamp(30px,7vw,58px);
+    color:var(--cream);text-shadow:0 4px 24px rgba(0,0,0,.9),0 0 60px rgba(0,0,0,.7)}
+
+  /* ───────── fade preto ───────── */
+  #fade{position:fixed;inset:0;z-index:70;background:#000;pointer-events:none;opacity:0;
+    transition:opacity 1.2s ease}
+  #fade.on{opacity:1}
+
+  /* ───────── toque ───────── */
+  #toque{position:fixed;inset:0;z-index:16;display:none;touch-action:none}
+  body.tatil #toque{display:block}
+
+  /* ───────── botão discreto sempre presente ───────── */
+  #escapar{position:fixed;left:18px;bottom:max(14px,env(safe-area-inset-bottom));z-index:17;
+    font-family:'Special Elite',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+    color:rgba(248,238,218,.3);text-decoration:underline;text-underline-offset:4px;
+    transition:color .2s;opacity:0;pointer-events:none}
+  #escapar.on{opacity:1;pointer-events:auto}
+  #escapar:hover{color:var(--brass-hi)}
+
+  #fps{position:fixed;right:8px;bottom:8px;z-index:19;font:11px monospace;
+    color:rgba(248,238,218,.35);pointer-events:none;display:none}
+  body.debug #fps{display:block}
+
+  @media (prefers-reduced-motion:reduce){
+    #titulo-fase.mostra{animation-duration:5s}
+    .achado{animation-duration:3s}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="tela"></canvas>
+
+<!-- ═════ HUD ═════ -->
+<div id="hud">
+  <div id="coracoes"></div>
+  <div id="trilha">
+    <div class="rot">caminho até a porta</div>
+    <div class="barra"><i></i></div>
+    <div class="pct">0%</div>
+  </div>
+  <div id="bolsa"><div class="n">0<span style="opacity:.4">/11</span></div><div class="r">cartas na bolsa</div></div>
+  <div id="achados"></div>
+  <div id="titulo-fase"><div class="n"></div><div class="t"></div></div>
+</div>
+
+<div id="toque"></div>
+<a id="escapar" href="#">ir direto para as cartas ♥</a>
+<div id="fps"></div>
+
+<!-- ═════ recados ═════ -->
+<div id="recado"><div class="cx">
+  <h3></h3><p></p><div class="acoes"></div>
+</div></div>
+
+<!-- ═════ legenda ═════ -->
+<div id="legenda"><span></span></div>
+
+<!-- ═════ pausa ═════ -->
+<div class="camada" id="pausa" hidden><div class="caixa">
+  <h2>Pausa</h2>
+  <div class="linha"><span class="rot">gráficos</span><span id="op-qualidade"></span></div>
+  <div class="linha"><span class="rot">som</span><span id="op-som"></span></div>
+  <div class="linha" style="margin-top:22px">
+    <button class="mini forte" id="btn-voltar">continuar</button>
+    <button class="mini" id="btn-recomecar">recomeçar a fase</button>
+  </div>
+  <div class="linha"><a class="pular" href="#" id="btn-pular-pausa">ir direto para as cartas ♥</a></div>
+</div></div>
+
+<!-- ═════ intro ═════ -->
+<div class="camada" id="intro" hidden><div class="caixa">
+  <div class="sobre">Correio dos Apaixonados · Agência Nº ♥</div>
+  <h1>LONDRES,<br>5 ANOS DEPOIS</h1>
+  <p class="conto">Tem uma agência do outro lado da cidade guardando onze cartas com o seu nome.
+    Elas estão lá desde 2021. Só falta você chegar até a porta.</p>
+  <button class="botao" id="btn-comecar">Começar a caminhada</button>
+  <div class="teclas">
+    <span><b>←</b><b>→</b> desviar</span>
+    <span><b>espaço</b> pular</span>
+    <span><b>↓</b> abaixar</span>
+    <span><b>esc</b> pausar</span>
+  </div>
+  <div><a class="pular" href="#" id="btn-pular-intro">prefiro ir direto para as cartas ♥</a></div>
+</div></div>
+
+<!-- ═════ carregando ═════ -->
+<div class="camada" id="carregando"><div class="caixa">
+  <div class="selo">5 anos</div>
+  <div class="risca"></div>
+  <div id="barra"><i></i></div>
+  <p id="carga-txt">preparando Londres…</p>
+</div></div>
+
+<div id="fade"></div>
+
+<script type="module">
+/*{{BUNDLE}}*/
+</script>
+</body>
+</html>

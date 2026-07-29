@@ -405,9 +405,35 @@
   @keyframes heartfall{from{transform:translateY(-40px) rotate(0)}to{transform:translateY(110vh) rotate(340deg);opacity:.2}}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  /* ═════════════ CHEGANDO DO JOGO (index.html) ═════════════
+     Só entra em ação quando a URL traz ?from=jogo. Sem o parâmetro este
+     arquivo se comporta exatamente como sempre. */
+  #fade-jogo{position:fixed;inset:0;z-index:900;background:#000;pointer-events:none;
+    opacity:0;transition:opacity 1.3s ease}
+  .do-jogo #fade-jogo{opacity:1}
+  .do-jogo.revelado #fade-jogo{opacity:0}
+
+  /* escaninho cuja carta foi recolhida durante a corrida — só enfeite */
+  .slot.coletada{position:relative}
+  .slot.coletada .peek{box-shadow:0 0 0 1px rgba(201,151,63,.45), 0 0 20px rgba(201,151,63,.5)}
+  .slot.coletada::after{content:"✦";position:absolute;top:7px;right:9px;font-size:13px;
+    color:var(--brass-hi);text-shadow:0 0 9px rgba(201,151,63,.9);
+    animation:cintila 2.8s ease-in-out infinite}
+  @keyframes cintila{0%,100%{opacity:.45;transform:scale(.9)}50%{opacity:1;transform:scale(1.12)}}
+
+  .de-volta{color:inherit;text-decoration:none;opacity:.6;
+    border-bottom:1px dotted rgba(248,238,218,.35);transition:opacity .2s}
+  .de-volta:hover{opacity:1}
 </style>
+<script>
+  /* Precisa rodar antes do primeiro desenho, senão a rua pisca antes do preto. */
+  if (location.search.indexOf('from=jogo') > -1) document.documentElement.className = 'do-jogo';
+</script>
 </head>
 <body>
+
+<div id="fade-jogo"></div>
 
 <!-- Personalização: bloco CONFIG no <script> ao fim do arquivo.
      Cada carta tem um campo video: null — troque por "url-do-video.mp4"
@@ -459,7 +485,8 @@
     <div class="wall-plaque">ESCANINHOS · RETIRADA MEDIANTE SORRISO</div>
     <div class="grid" id="grid"></div>
   </div>
-  <footer>CORREIO DOS APAIXONADOS ✦ NENHUMA CARTA SE PERDE QUANDO O ENDEREÇO É VOCÊ</footer>
+  <footer>CORREIO DOS APAIXONADOS ✦ NENHUMA CARTA SE PERDE QUANDO O ENDEREÇO É VOCÊ
+    <br><a class="de-volta" href="index.html">↺ voltar para Londres e correr de novo</a></footer>
 </main>
 
 <div id="overlay">
@@ -553,6 +580,28 @@ const CONFIG = {
   }
 };
 
+/* ═════════════ chegando do jogo ═════════════
+   Dissolve do preto sobre a rua, para o corte com o final do jogo ler como um
+   movimento só, e lê ?c= para marcar as cartas que ela recolheu correndo.
+   Nada aqui tranca nenhuma carta: quem perdeu envelope no jogo simplesmente
+   não ganha o brilhinho, e abre tudo do mesmo jeito. */
+const paramsJogo = new URLSearchParams(location.search);
+const veioDoJogo = paramsJogo.get('from') === 'jogo';
+const coletadasNoJogo = new Set(
+  (paramsJogo.get('c') || '').split(',')
+    .map(n => parseInt(n, 10))
+    .filter(n => Number.isInteger(n))
+);
+if (veioDoJogo) {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.documentElement.classList.add('revelado');
+  }));
+  setTimeout(() => {
+    const capa = document.getElementById('fade-jogo');
+    if (capa) capa.remove();
+  }, 2200);
+}
+
 /* ═════════════ maquinário ═════════════ */
 const grid = document.getElementById('grid');
 const overlay = document.getElementById('overlay');
@@ -598,7 +647,7 @@ door.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') enterAgen
 /* ── escaninhos ── */
 CONFIG.cartas.forEach((c,i)=>{
   const b=document.createElement('button');
-  b.className='slot'; b.dataset.i=i;
+  b.className='slot' + (coletadasNoJogo.has(i) ? ' coletada' : ''); b.dataset.i=i;
   b.setAttribute('aria-label', `${c.tipo} de ${c.data}`);
   const tilt=((i*53)%9-4)+'deg';
   b.innerHTML = c.tipo==='telegrama'
