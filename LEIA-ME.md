@@ -24,7 +24,7 @@ O `index.html` é **gerado** — não edite ele à mão. As fontes estão em `js
 
 | Arquivo | O que faz |
 |---|---|
-| `js/fases.js` | **Comece por aqui.** As três cenas em forma de dados: cor do céu, luz, neblina, quais obstáculos aparecem, onde ficam os envelopes, ajustes de câmera. |
+| `js/fases.js` | **Comece por aqui.** As três cenas em forma de dados: cor do céu, luz, neblina, quais obstáculos aparecem, onde ficam os envelopes, os marcos de Londres, ajustes de câmera. |
 | `js/jogo.js` | Laço de passo fixo, colisão, corações, checkpoints, pausa, cutscene final. |
 | `js/mundo.js` | Rua, casas, adereços, carros, marcos de Londres, chuva, a fachada da agência. |
 | `js/materiais.js` | Texturas desenhadas em `<canvas>` na hora (asfalto, calçada, paralelepípedo, grama, fachadas) e o céu que gera o env map. |
@@ -57,6 +57,13 @@ Sem esses parâmetros o jogo começa do início, como deve.
 **Coletar envelope não destrava nada.** Os onze envelopes espalhados pelas cenas correspondem às onze cartas. Quem recolhe ganha um brilho dourado no escaninho correspondente; quem não recolhe abre a carta do mesmo jeito.
 
 **O trajeto é sempre o mesmo.** Os obstáculos são sorteados com semente fixa, então a corrida dá para aprender em vez de depender de azar.
+
+**Os marcos de Londres têm dois papéis, e a diferença importa.** Em `js/fases.js`:
+
+- `pontos` são lugares **por onde ela passa**. Ficam parados num `z` do trajeto, e a fileira de casas abre uma clareira (`claro`, em metros) para o marco caber. Toda clareira precisa de chão, senão sobra o vazio embaixo do horizonte — daí o campo `piso`, que aceita `'praca'` (calçamento) ou `'agua'` (o Tâmisa, com muro de arrimo). O campo `legenda` mostra uma frase quando ela chega perto, com `aviso` metros de antecedência.
+- `marcos` são **pano de fundo**: mantêm distância fixa da câmera e nunca são alcançados, como cenário de teatro.
+
+Hoje ela atravessa a praça de Westminster com o Parlamento e o Big Ben (cena 1), passa sob a roda-gigante plantada no lago (cena 2) e cruza a **Tower Bridge** entre as duas torres, com o rio dos dois lados (cena 3). Vale dizer: a icônica das duas torres é a Tower Bridge; a London Bridge é a lisa ao lado. E a ponte aqui atravessa a rua da cena, não um Tâmisa geograficamente correto — é uma Londres de desenho, não um mapa.
 
 **As cartas são intocáveis.** O `correio-dos-apaixonados-v2.html` só recebeu acréscimos: a capa preta que dissolve quando a URL traz `?from=jogo`, o brilho nos escaninhos vindos de `?c=`, e um link para jogar de novo. Abrir aquele arquivo sem parâmetro nenhum se comporta exatamente como antes.
 

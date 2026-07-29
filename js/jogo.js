@@ -776,6 +776,15 @@ export function iniciar() {
     menina.raiz.visible = !piscando || estado.modo === 'final';
 
     atualizarTrilha();
+    // legenda ao se aproximar de um marco do trajeto
+    if (mundo && mundo.pontos && estado.modo === 'correndo') {
+      for (const p of mundo.pontos) {
+        if (!p.mostrada && estado.dist > p.z - p.aviso) {
+          p.mostrada = true;
+          dizerLegenda(p.legenda, 4400);
+        }
+      }
+    }
     if (luzHeroi.visible) luzHeroi.position.set(estado.x, estado.y + 2.6, estado.dist - 1.2);
     if (mundo) mundo.atualizar(dt, estado.dist, camera.position);
     if (agencia) agencia.coracao.position.y = 8.4 + Math.sin(agora / 700) * 0.14;
@@ -855,6 +864,18 @@ export function iniciar() {
     if (memoria.ler('jogou', false)) {
       const p = elIntro.querySelector('.conto');
       p.textContent = 'Você já chegou até a porta uma vez. Pode correr de novo, ou ir direto para as cartas — elas continuam lá.';
+    }
+
+    // gancho de inspeção, só com #debug na URL: permite medir posições e
+    // caixas envolventes de dentro do navegador sem poluir o escopo global
+    if (document.body.classList.contains('debug')) {
+      window.__jogo = {
+        get cena() { return cena; },
+        get camera() { return camera; },
+        get estado() { return estado; },
+        get mundo() { return mundo; },
+        get fase() { return fase; },
+      };
     }
 
     anterior = performance.now();

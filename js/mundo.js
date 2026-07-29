@@ -3,9 +3,11 @@
    passa de um bloco, ele é remontado lá na frente. Como as geometrias e os
    materiais são compartilhados, remontar custa quase nada.
 
-   Os marcos de Londres (Big Ben, o Parlamento, a roda-gigante) ficam a uma
-   distância fixa da câmera e acompanham o trajeto, então nunca são alcançados
-   — é o mesmo truque de fundo dos cenários de teatro.
+   Marcos de Londres em dois papéis. Os "pontos" ficam parados num z do
+   trajeto e ela passa por eles de verdade: a praça de Westminster com o
+   Parlamento e o Big Ben, a roda-gigante sobre o lago, e a travessia da Tower
+   Bridge com o Tâmisa dos dois lados. Já os "marcos" mantêm distância fixa da
+   câmera e nunca são alcançados — pano de fundo, como cenário de teatro.
    ═════════════════════════════════════════ */
 
 import { Group, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, BoxGeometry, PlaneGeometry,
@@ -53,14 +55,25 @@ function criarChao(fase, comprimento) {
     const gramaTex = Mat.grama(fase.semente);
     const caminhoTex = Mat.calcada(fase.molhado, fase.semente + 3);
 
-    const grama = new Mesh(
-      new PlaneGeometry(120, comprimento),
-      materialChao(gramaTex, [40, comprimento / 3])
-    );
-    grama.rotation.x = -Math.PI / 2;
-    grama.position.y = -0.06;
-    grama.receiveShadow = true;
-    g.add(grama);
+    /* A grama vem em duas faixas que NÃO passam por cima do lago. Antes era um
+       plano único de 120 m e o lago ficava 10 cm abaixo dele: nessa distância,
+       em ângulo rasante, os dois planos brigavam por precisão de profundidade
+       e a água simplesmente não aparecia. Recortar é mais barato que empilhar. */
+    /* A margem tem que ficar PERTO do caminho. Com o lago começando em x=-15,
+       ele caía fora do quadro: a 20 m à frente a borda da tela só alcança
+       x≈-18, então sobrava um fiapo de água escondido pelas árvores. */
+    const LAGO_DE = -58, LAGO_ATE = -11;
+    for (const [de, ate] of [[LAGO_ATE, 60], [-120, LAGO_DE]]) {
+      const larg = ate - de;
+      const grama = new Mesh(
+        new PlaneGeometry(larg, comprimento),
+        materialChao(gramaTex, [larg / 3, comprimento / 3])
+      );
+      grama.rotation.x = -Math.PI / 2;
+      grama.position.set((de + ate) / 2, -0.04, 0);
+      grama.receiveShadow = true;
+      g.add(grama);
+    }
 
     const caminho = new Mesh(
       new PlaneGeometry(larguraVia, comprimento),
@@ -72,17 +85,28 @@ function criarChao(fase, comprimento) {
 
     // o lago, do lado esquerdo
     const lago = new Mesh(
-      new PlaneGeometry(46, comprimento),
-      new MeshPhysicalMaterial({
-        // espelho perfeito devolvia o céu creme e a água virava mais um
-        // pedaço de fundo; um pouco de aspereza e cor própria fazem ler água
-        color: new Color(fase.corAgua || '#1b2a2e'),
-        roughness: 0.16, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.06,
+      new PlaneGeometry(LAGO_ATE - LAGO_DE, comprimento),
+      /* Sem verniz e sem metal: em ângulo rasante o Fresnel do clearcoat
+         chega perto de 100% e a água virava um espelho branco do céu dourado.
+         Fisicamente correto, visualmente errado aqui — num mundo de desenho a
+         cor própria tem que ganhar. */
+      new MeshStandardMaterial({
+        color: new Color(fase.corAgua || '#2e6b7d'),
+        roughness: 0.45, metalness: 0,
       })
     );
     lago.rotation.x = -Math.PI / 2;
-    lago.position.set(-38, 0.04, 0);
+    lago.position.set((LAGO_DE + LAGO_ATE) / 2, -0.12, 0);
     g.add(lago);
+
+    // mureta de pedra na margem
+    const margem = new Mesh(
+      new BoxGeometry(0.5, 0.5, comprimento),
+      new MeshStandardMaterial({ color: new Color('#cbc0a8'), roughness: 0.85 })
+    );
+    margem.position.set(LAGO_ATE, 0.1, 0);
+    margem.receiveShadow = true;
+    g.add(margem);
     return g;
   }
 
@@ -475,22 +499,157 @@ function fazArvore(r, cores) {
   return g;
 }
 
+/* ── pontos do trajeto: marcos por onde ela passa de verdade ────────────
+   Diferente dos "marcos", que ficam a uma distância fixa da câmera e nunca
+   são alcançados, estes ficam parados num z do trajeto. Para eles caberem,
+   a fileira de casas abre uma clareira — e a clareira precisa de chão, senão
+   sobra o vazio embaixo do horizonte.
+   ─────────────────────────────────────────────────────────────────────── */
+
+function fazPisoDaClareira(p, fase) {
+  const g = new Group();
+  const comp = p.claro + 30;
+
+  if (p.piso === 'agua') {
+    // o Tâmisa dos dois lados da ponte, abaixo do nível do tabuleiro
+    // mesma razão do lago: verniz em ângulo rasante estoura para branco
+    const matAgua = new MeshStandardMaterial({
+      color: new Color(fase.corRio || '#3f6f80'),
+      roughness: 0.42, metalness: 0,
+    });
+    for (const lado of [-1, 1]) {
+      const agua = new Mesh(new PlaneGeometry(80, comp), matAgua);
+      agua.rotation.x = -Math.PI / 2;
+      agua.position.set(lado * (FRENTE_PREDIO + 40), -1.3, p.z);
+      g.add(agua);
+    }
+    // muro de arrimo escondendo a borda do tabuleiro
+    const matMuro = new MeshStandardMaterial({ color: new Color('#c3b9a4'), roughness: 0.85 });
+    for (const lado of [-1, 1]) {
+      // parapeito rente ao tabuleiro: mais alto que isso e ele tapava o rio
+      const muro = new Mesh(new BoxGeometry(0.6, 2.4, comp), matMuro);
+      muro.position.set(lado * (FRENTE_PREDIO + 0.3), -1, p.z);
+      muro.receiveShadow = true;
+      g.add(muro);
+    }
+    return g;
+  }
+
+  if (p.piso !== 'praca') return g;
+
+  const tex = Mat.calcada(fase.molhado, fase.semente + 21);
+  for (const lado of (p.lado ? [p.lado] : [-1, 1])) {
+    const m = new Mesh(new PlaneGeometry(80, comp), materialChao(tex, [20, comp / 4]));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(lado * (FRENTE_PREDIO + 40), 0.16, p.z);
+    m.receiveShadow = true;
+    g.add(m);
+
+    const bal = fazBalaustrada(comp, lado);
+    bal.position.y = 0.16;
+    bal.position.z = p.z;
+    g.add(bal);
+  }
+  return g;
+}
+
+function criarPontos(fase, alvo) {
+  const lista = [];
+  for (const p of (fase.pontos || [])) {
+    let obj = null;
+    if (p.tipo === 'bigben') obj = fazBigBen();
+    else if (p.tipo === 'parlamento') obj = fazParlamento();
+    else if (p.tipo === 'roda') obj = fazRodaGigante();
+    else if (p.tipo === 'ponte') obj = fazTowerBridge();
+    if (!obj) continue;
+
+    obj.position.set(p.x || 0, p.y || 0, p.z);
+    if (p.rot) obj.rotation.y = p.rot;
+    obj.scale.setScalar(p.escala || 1);
+    alvo.add(obj);
+    alvo.add(fazPisoDaClareira(p, fase));
+
+    if (p.legenda) lista.push({ z: p.z, legenda: p.legenda, aviso: p.aviso ?? 60, mostrada: false });
+  }
+  return lista;
+}
+
 /* ── marcos ao longe ───────────────────────────────────────────────────── */
 
+/**
+ * Torre Elizabeth, o Big Ben. Calcário quente e claro, no tom da paleta —
+ * o verde-oliva da primeira versão brigava com o pastel da rua toda.
+ *
+ * O que faz uma caixa de 62 m parecer uma torre gótica é o ritmo vertical:
+ * pilastras subindo de ponta a ponta, cordões horizontais marcando os
+ * pavimentos e janelas estreitas e altas entre elas. Sem isso era um paredão.
+ */
 function fazBigBen() {
   const g = new Group();
-  const matPedra = new MeshStandardMaterial({ color: new Color('#8b7b5e'), roughness: 0.95 });
+  const matPedra = new MeshStandardMaterial({ color: new Color('#dcc9a2'), roughness: 0.88 });
+  const matSombra = new MeshStandardMaterial({ color: new Color('#b9a37c'), roughness: 0.9 });
+  const matVitral = new MeshStandardMaterial({
+    color: new Color('#7f97b0'), roughness: 0.3, metalness: 0.1,
+    emissive: new Color('#38485c'), emissiveIntensity: 0.45,
+  });
   const matDourado = new MeshStandardMaterial({
-    color: new Color('#c9973f'), roughness: 0.4, metalness: 0.7,
-    emissive: new Color('#7a5a1c'), emissiveIntensity: 0.8,
+    color: new Color('#e0b055'), roughness: 0.35, metalness: 0.75,
+    emissive: new Color('#7a5a1c'), emissiveIntensity: 0.9,
   });
 
-  const torre = new Mesh(new BoxGeometry(11, 62, 11), matPedra);
-  torre.position.y = 31;
+  const L = 11;         // lado da torre
+  const H = 62;         // altura do fuste
+
+  const torre = new Mesh(new BoxGeometry(L, H, L), matPedra);
+  torre.position.y = H / 2;
+  torre.castShadow = true;
+  torre.receiveShadow = true;
   g.add(torre);
+
+  // embasamento
+  const base = new Mesh(new BoxGeometry(L + 1.6, 4, L + 1.6), matSombra);
+  base.position.y = 2;
+  g.add(base);
+
+  // pilastras nos cantos e no meio de cada face, subindo o fuste inteiro
+  for (const [dx, dz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+    const pil = new Mesh(new BoxGeometry(1.7, H - 3, 1.7), matPedra);
+    pil.position.set(dx * (L / 2 - 0.2), (H - 3) / 2 + 2, dz * (L / 2 - 0.2));
+    pil.castShadow = true;
+    g.add(pil);
+  }
+  for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+    const pil = new Mesh(new BoxGeometry(dx ? 1.1 : 1.5, H - 6, dz ? 1.1 : 1.5), matPedra);
+    pil.position.set(dx * (L / 2 + 0.2), (H - 6) / 2 + 3, dz * (L / 2 + 0.2));
+    g.add(pil);
+  }
+
+  // cordões horizontais e janelas altas entre eles
+  for (let piso = 0; piso < 5; piso++) {
+    const y = 8 + piso * 11;
+    const cordao = new Mesh(new BoxGeometry(L + 1, 0.9, L + 1), matSombra);
+    cordao.position.y = y - 3.4;
+    g.add(cordao);
+
+    for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const jan = new Mesh(new BoxGeometry(dz ? 2.6 : 0.4, 6.4, dx ? 2.6 : 0.4), matVitral);
+      jan.position.set(dx * (L / 2 + 0.1), y + 1.6, dz * (L / 2 + 0.1));
+      g.add(jan);
+      const capuz = new Mesh(new ConeGeometry(1.6, 1.9, 3), matPedra);
+      capuz.position.set(dx * (L / 2 + 0.1), y + 5.8, dz * (L / 2 + 0.1));
+      capuz.rotation.y = dx ? 0 : Math.PI / 2;
+      g.add(capuz);
+    }
+  }
+
   const relogioBase = new Mesh(new BoxGeometry(12.4, 12, 12.4), matPedra);
   relogioBase.position.y = 66;
+  relogioBase.castShadow = true;
   g.add(relogioBase);
+  // anel dourado sob o estágio do relógio
+  const anelOuro = new Mesh(new BoxGeometry(13, 0.7, 13), matDourado);
+  anelOuro.position.y = 59.6;
+  g.add(anelOuro);
 
   // os quatro relógios acesos
   for (let i = 0; i < 4; i++) {
@@ -511,10 +670,19 @@ function fazBigBen() {
 
   const belfry = new Mesh(new BoxGeometry(11.5, 9, 11.5), matPedra);
   belfry.position.y = 77;
+  belfry.castShadow = true;
   g.add(belfry);
-  const pyramid = new Mesh(new ConeGeometry(8.4, 16, 4), matPedra);
+  // aberturas do campanário, onde fica o sino que dá nome à torre
+  for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+    const abertura = new Mesh(new BoxGeometry(dz ? 6.4 : 0.4, 6, dx ? 6.4 : 0.4),
+      new MeshStandardMaterial({ color: new Color('#3d3a33'), roughness: 0.95 }));
+    abertura.position.set(dx * 5.8, 77, dz * 5.8);
+    g.add(abertura);
+  }
+  const pyramid = new Mesh(new ConeGeometry(8.4, 16, 4), matSombra);
   pyramid.position.y = 89.5;
   pyramid.rotation.y = Math.PI / 4;
+  pyramid.castShadow = true;
   g.add(pyramid);
   const flecha = new Mesh(new ConeGeometry(1.4, 9, 8), matDourado);
   flecha.position.y = 101;
@@ -522,34 +690,135 @@ function fazBigBen() {
   return g;
 }
 
+/**
+ * Palácio de Westminster. A primeira versão era uma caixa lisa de 150 m com
+ * pontinhas em cima, e de perto lia como um galpão bege. O que faz o olho
+ * dizer "gótico vitoriano" é o ritmo vertical: contraforte, janela ogival,
+ * contraforte. É isso que está aqui agora.
+ */
 function fazParlamento() {
   const g = new Group();
-  const matPedra = new MeshStandardMaterial({ color: new Color('#7d7059'), roughness: 0.95 });
-  const corpo = new Mesh(new BoxGeometry(150, 26, 22), matPedra);
-  corpo.position.y = 13;
+  const PEDRA = '#d9c9a3';
+  const matPedra = new MeshStandardMaterial({ color: new Color(PEDRA), roughness: 0.9 });
+  const matSombra = new MeshStandardMaterial({ color: new Color('#b8a480'), roughness: 0.92 });
+  const matVitral = new MeshStandardMaterial({
+    color: new Color('#8ea6bd'), roughness: 0.25, metalness: 0.1,
+    emissive: new Color('#3d4f66'), emissiveIntensity: 0.5,
+  });
+
+  const COMP = 150;
+  const ALTO = 26;
+
+  const corpo = new Mesh(new BoxGeometry(COMP, ALTO, 22), matPedra);
+  corpo.position.y = ALTO / 2;
+  corpo.receiveShadow = true;
   g.add(corpo);
+
+  // embasamento mais escuro, para a fachada não flutuar
+  const base = new Mesh(new BoxGeometry(COMP + 1.4, 3.2, 23.4), matSombra);
+  base.position.y = 1.6;
+  g.add(base);
+
   const r = sorteio(4242);
-  for (let i = 0; i < 26; i++) {
-    const t = new Mesh(new BoxGeometry(3, r.entre(6, 11), 3), matPedra);
-    t.position.set(-72 + i * 5.8, 26 + t.geometry.parameters.height / 2, 0);
+  const VAOS = 25;
+  const passo = COMP / VAOS;
+
+  for (let i = 0; i < VAOS; i++) {
+    const x = -COMP / 2 + passo * (i + 0.5);
+
+    // contraforte saliente entre os vãos
+    const contra = new Mesh(new BoxGeometry(1.5, ALTO - 1, 1.6), matPedra);
+    contra.position.set(x - passo / 2, (ALTO - 1) / 2, 11.6);
+    contra.castShadow = true;
+    g.add(contra);
+
+    // duas fileiras de janelas ogivais: retângulo alto com capuz triangular
+    for (const [y, alt] of [[9, 7.5], [19, 6]]) {
+      const jan = new Mesh(new BoxGeometry(passo * 0.45, alt, 0.5), matVitral);
+      jan.position.set(x, y, 11.2);
+      g.add(jan);
+      const capuz = new Mesh(new ConeGeometry(passo * 0.3, 1.8, 3), matPedra);
+      capuz.position.set(x, y + alt / 2 + 0.8, 11.2);
+      capuz.rotation.y = Math.PI / 2;
+      g.add(capuz);
+    }
+
+    // pináculo no coroamento
+    const t = new Mesh(new BoxGeometry(1.9, r.entre(5, 8.5), 1.9), matPedra);
+    t.position.set(x - passo / 2, ALTO + t.geometry.parameters.height / 2, 8);
+    t.castShadow = true;
     g.add(t);
-    const p = new Mesh(new ConeGeometry(2.2, 5, 4), matPedra);
-    p.position.set(t.position.x, t.position.y + t.geometry.parameters.height / 2 + 2.5, 0);
+    const p = new Mesh(new ConeGeometry(1.5, 4, 4), matPedra);
+    p.position.set(t.position.x, t.position.y + t.geometry.parameters.height / 2 + 2, 8);
     p.rotation.y = Math.PI / 4;
     g.add(p);
   }
-  const torreVitoria = new Mesh(new BoxGeometry(17, 58, 17), matPedra);
-  torreVitoria.position.set(-84, 29, 0);
-  g.add(torreVitoria);
+
+  // parapeito vazado correndo o topo
+  const parapeito = new Mesh(new BoxGeometry(COMP, 1.6, 1), matPedra);
+  parapeito.position.set(0, ALTO + 0.8, 10.6);
+  g.add(parapeito);
+
+  // Torre Victoria, na ponta sul
+  const torre = new Mesh(new BoxGeometry(17, 58, 17), matPedra);
+  torre.position.set(-COMP / 2 - 3, 29, 2);
+  torre.castShadow = true;
+  g.add(torre);
+  for (let i = 0; i < 3; i++) {
+    const faixa = new Mesh(new BoxGeometry(17.6, 1, 17.6), matSombra);
+    faixa.position.set(-COMP / 2 - 3, 16 + i * 14, 2);
+    g.add(faixa);
+  }
+  const coroaTorre = new Mesh(new ConeGeometry(11, 12, 4), matPedra);
+  coroaTorre.position.set(-COMP / 2 - 3, 64, 2);
+  coroaTorre.rotation.y = Math.PI / 4;
+  g.add(coroaTorre);
+
+  return g;
+}
+
+/**
+ * Balaustrada de pedra fechando a praça. Sem ela o calçamento da clareira
+ * escapa até o horizonte e a praça vira uma mancha branca sem fim.
+ */
+function fazBalaustrada(comprimento, lado) {
+  const g = new Group();
+  const matPedra = new MeshStandardMaterial({ color: new Color('#d8d0bd'), roughness: 0.88 });
+  const base = new Mesh(new BoxGeometry(1.1, 0.5, comprimento), matPedra);
+  base.position.y = 0.25;
+  g.add(base);
+  const capa = new Mesh(new BoxGeometry(1.25, 0.28, comprimento), matPedra);
+  capa.position.y = 1.42;
+  g.add(capa);
+  const quantos = Math.floor(comprimento / 1.1);
+  for (let i = 0; i < quantos; i++) {
+    const b = new Mesh(new CylinderGeometry(0.17, 0.23, 0.95, 8), matPedra);
+    b.position.set(0, 0.95, -comprimento / 2 + 0.55 + i * 1.1);
+    g.add(b);
+  }
+  // pilares de canto a cada 12 m
+  for (let z = -comprimento / 2; z <= comprimento / 2; z += 12) {
+    const pil = new Mesh(new BoxGeometry(1.5, 2.1, 1.5), matPedra);
+    pil.position.set(0, 1.05, z);
+    g.add(pil);
+    const luminaria = new Mesh(new SphereGeometry(0.34, 12, 10), new MeshStandardMaterial({
+      color: new Color('#fff0cf'), emissive: new Color('#ffd79a'),
+      emissiveIntensity: 2.6, roughness: 1,
+    }));
+    luminaria.position.set(0, 2.5, z);
+    g.add(luminaria);
+  }
+  g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+  g.position.x = lado * (FRENTE_PREDIO + 26);
   return g;
 }
 
 function fazRodaGigante() {
   const g = new Group();
-  const matAco = new MeshStandardMaterial({ color: new Color('#5c6773'), roughness: 0.5, metalness: 0.6 });
+  const matAco = new MeshStandardMaterial({ color: new Color('#e8ecef'), roughness: 0.38, metalness: 0.45 });
   const matLuz = new MeshStandardMaterial({
-    color: new Color('#8fd4ff'), emissive: new Color('#5fc0ff'),
-    emissiveIntensity: 2.4, roughness: 1,
+    color: new Color('#bfe6ff'), emissive: new Color('#6ec6ff'),
+    emissiveIntensity: 2.8, roughness: 1,
   });
   const aro = new Mesh(new TorusGeometry(30, 0.7, 8, 60), matAco);
   aro.position.y = 33;
@@ -574,6 +843,167 @@ function fazRodaGigante() {
     perna.rotation.x = -0.25;
     g.add(perna);
   }
+  return g;
+}
+
+/**
+ * Tower Bridge. As duas torres flanqueiam a via, então ela atravessa por
+ * dentro — que é exatamente como a ponte de verdade funciona: o tabuleiro
+ * passa entre as torres, e as passarelas altas ligam uma à outra por cima.
+ *
+ * Cor de pedra clara e azul de aço, como a ponte é pintada desde 1977.
+ */
+function fazTowerBridge() {
+  const g = new Group();
+  const PEDRA = '#e0d6bd';
+  const AZUL = '#4b7fb4';
+  const matPedra = new MeshStandardMaterial({ color: new Color(PEDRA), roughness: 0.82 });
+  const matAzul = new MeshStandardMaterial({ color: new Color(AZUL), roughness: 0.45, metalness: 0.35 });
+  const matAzulClaro = new MeshStandardMaterial({ color: new Color('#6d9ecb'), roughness: 0.5, metalness: 0.3 });
+  const matPedraFunda = new MeshStandardMaterial({ color: new Color('#bdb094'), roughness: 0.88 });
+
+  const VAO = 11.5;      // meio-afastamento das torres
+  const ALTURA = 30;     // altura do corpo da torre
+
+  function torre(lado) {
+    const t = new Group();
+    t.position.x = lado * VAO;
+
+    // pier de pedra na base
+    const pier = new Mesh(Mat.caixaArredondada(10, 2.4, 12, 0.3, 2), matPedra);
+    pier.position.y = 1.2;
+    t.add(pier);
+
+    // corpo, em dois blocos que afinam
+    const baixo = new Mesh(Mat.caixaArredondada(7.6, ALTURA * 0.62, 9, 0.25, 2), matPedra);
+    baixo.position.y = 2.4 + ALTURA * 0.31;
+    t.add(baixo);
+    const alto = new Mesh(Mat.caixaArredondada(6.8, ALTURA * 0.38, 8.2, 0.25, 2), matPedra);
+    alto.position.y = 2.4 + ALTURA * 0.62 + ALTURA * 0.19;
+    t.add(alto);
+
+    /* Janelas ogivais azuis e cordões — o detalhe que faz ler "gótico
+       vitoriano". Precisam estar TAMBÉM nas faces viradas para a rua (±z),
+       porque é essa a face que ela vê durante toda a aproximação; só nas
+       faces laterais, a torre virava um paredão claro sem informação. */
+    for (const sz of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const jan = new Mesh(new BoxGeometry(1.5, 3.4, 0.14), matAzul);
+        jan.position.set(0, 8 + i * 6.2, sz * 4.6);
+        t.add(jan);
+        for (const sx of [-1, 1]) {
+          const j2 = new Mesh(new BoxGeometry(1.1, 3, 0.14), matAzul);
+          j2.position.set(sx * 2.5, 8 + i * 6.2, sz * 4.6);
+          t.add(j2);
+        }
+      }
+    }
+    for (const sx of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const jan = new Mesh(new BoxGeometry(0.14, 3.4, 1.5), matAzul);
+        jan.position.set(sx * 3.85, 8 + i * 6.2, 0);
+        t.add(jan);
+      }
+    }
+    // cordões horizontais em tom mais fundo, marcando os pavimentos
+    for (const y of [6, 12.2, 18.4, 24.6]) {
+      const cordao = new Mesh(new BoxGeometry(8.2, 0.7, 9.6), matPedraFunda);
+      cordao.position.y = y;
+      t.add(cordao);
+    }
+
+    // quatro torreões com capuz cônico
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const tur = new Mesh(new CylinderGeometry(1.15, 1.3, 8, 12), matPedra);
+        tur.position.set(sx * 3.3, ALTURA + 1.5, sz * 3.9);
+        t.add(tur);
+        const capuz = new Mesh(new ConeGeometry(1.5, 4.2, 12), matPedra);
+        capuz.position.set(sx * 3.3, ALTURA + 7.6, sz * 3.9);
+        t.add(capuz);
+        const pinaculo = new Mesh(new SphereGeometry(0.3, 10, 8), new MeshStandardMaterial({
+          color: new Color('#d8ab4e'), roughness: 0.35, metalness: 0.7,
+          emissive: new Color('#6b4d16'), emissiveIntensity: 0.6,
+        }));
+        pinaculo.position.set(sx * 3.3, ALTURA + 10, sz * 3.9);
+        t.add(pinaculo);
+      }
+    }
+
+    // telhado central e agulha
+    const telhado = new Mesh(new ConeGeometry(4.6, 7, 4), matPedra);
+    telhado.position.y = ALTURA + 5.4;
+    telhado.rotation.y = Math.PI / 4;
+    t.add(telhado);
+    const agulha = new Mesh(new ConeGeometry(0.55, 5, 8), matPedra);
+    agulha.position.y = ALTURA + 11;
+    t.add(agulha);
+
+    t.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    return t;
+  }
+
+  g.add(torre(-1), torre(1));
+
+  // as duas passarelas altas ligando as torres
+  for (const [y, alt] of [[24.5, 1.1], [28.6, 1.4]]) {
+    const p = new Mesh(Mat.caixaArredondada(VAO * 2 - 6, alt, 4.2, 0.16, 2), matAzulClaro);
+    p.position.y = y;
+    p.castShadow = true;
+    g.add(p);
+  }
+  // treliça diagonal entre as passarelas
+  for (let i = 0; i < 7; i++) {
+    const x = -VAO + 4 + i * ((VAO * 2 - 8) / 6);
+    const d = new Mesh(new CylinderGeometry(0.16, 0.16, 4.6, 6), matAzul);
+    d.position.set(x, 26.6, 0);
+    d.rotation.z = i % 2 === 0 ? 0.72 : -0.72;
+    g.add(d);
+  }
+
+  /* Correntes de suspensão: a curva é aproximada por segmentos retos que
+     descem da torre até o tabuleiro. Três segmentos já leem como catenária. */
+  for (const lado of [-1, 1]) {
+    for (const z of [-4.4, 4.4]) {
+      let x0 = lado * (VAO - 3.4);
+      let y0 = ALTURA - 1;
+      const passos = [[6.5, -9], [7, -7], [7.5, -5.5]];
+      for (const [dx, dy] of passos) {
+        const x1 = x0 + lado * dx;
+        const y1 = y0 + dy;
+        const comp = Math.hypot(x1 - x0, y1 - y0);
+        const corrente = new Mesh(new CylinderGeometry(0.17, 0.17, comp, 6), matAzul);
+        corrente.position.set((x0 + x1) / 2, (y0 + y1) / 2, z);
+        corrente.rotation.z = Math.atan2(x1 - x0, -(y1 - y0));
+        g.add(corrente);
+        // pendural até o tabuleiro
+        const pend = new Mesh(new CylinderGeometry(0.07, 0.07, y1 - 1.2, 5), matAzul);
+        pend.position.set(x1, (y1 + 1.2) / 2, z);
+        g.add(pend);
+        x0 = x1; y0 = y1;
+      }
+    }
+  }
+
+  // Guarda-corpo na borda externa da calçada, sobre a água — é ali que fica
+  // na ponte de verdade, e não no meio-fio.
+  const COMP_GUARDA = 104;
+  for (const lado of [-1, 1]) {
+    const corrimao = new Mesh(new CylinderGeometry(0.1, 0.1, COMP_GUARDA, 8), matAzul);
+    corrimao.rotation.x = Math.PI / 2;
+    corrimao.position.set(lado * 9.1, 1.35, 0);
+    g.add(corrimao);
+    const meio = new Mesh(new CylinderGeometry(0.06, 0.06, COMP_GUARDA, 6), matAzul);
+    meio.rotation.x = Math.PI / 2;
+    meio.position.set(lado * 9.1, 0.78, 0);
+    g.add(meio);
+    for (let i = 0; i <= 34; i++) {
+      const balaustre = new Mesh(new BoxGeometry(0.11, 1.35, 0.11), matAzul);
+      balaustre.position.set(lado * 9.1, 0.68, -COMP_GUARDA / 2 + i * (COMP_GUARDA / 34));
+      g.add(balaustre);
+    }
+  }
+
   return g;
 }
 
@@ -833,6 +1263,20 @@ export function criarMundo(cena, renderer, fase, preset) {
   const blocos = [];
   const QUANTOS_BLOCOS = Math.ceil(preset.distancia / BLOCO) + 2;
 
+  /* Clareiras: trechos onde a fileira de casas abre para o marco caber.
+     `lado` 0 abre nos dois lados. */
+  const clareiras = (fase.pontos || [])
+    .filter((p) => p.claro)
+    .map((p) => ({ de: p.z - p.claro / 2, ate: p.z + p.claro / 2, lado: p.lado || 0 }));
+
+  function naClareira(z, lado, meia = 0) {
+    for (const c of clareiras) {
+      if (c.lado !== 0 && c.lado !== lado) continue;
+      if (z + meia > c.de && z - meia < c.ate) return true;
+    }
+    return false;
+  }
+
   function montarBloco(g, indice, registro) {
     while (g.children.length) g.remove(g.children[0]);
     registro.postes.length = 0;
@@ -844,27 +1288,53 @@ export function criarMundo(cena, renderer, fase, preset) {
       const cores = fase.coresFolhagem;
       const quantas = Math.round(r.inteiro(4, 7) * preset.arvores);
       for (let i = 0; i < quantas; i++) {
-        const lado = r.chance(0.5) ? -1 : 1;
+        // árvores só no lado sem lago: do outro lado elas fechavam a vista
+        // da água, que é justamente o que se quer ver ali
         const a = fazArvore(r, cores);
-        a.position.set(lado * r.entre(7, 20), 0, r.entre(0, BLOCO));
+        a.position.set(r.entre(7, 22), 0, r.entre(0, BLOCO));
         a.scale.setScalar(r.entre(0.85, 1.3));
         g.add(a);
       }
       // bancos do parque e postes baixos, sempre fora das faixas
-      if (r.chance(0.55)) {
-        const b = new Mesh(new BoxGeometry(1.6, 0.1, 0.5),
-          new MeshStandardMaterial({ color: new Color('#5c3a24'), roughness: 0.9 }));
-        b.position.set(r.chance(0.5) ? -6 : 6, 0.5, r.entre(2, BLOCO - 2));
-        b.castShadow = true;
+      if (r.chance(0.6)) {
+        const b = prop('bancoParque', () => {
+          const bg = new Group();
+          const matMad = new MeshStandardMaterial({ color: new Color('#8a5a34'), roughness: 0.85 });
+          const assento = new Mesh(Mat.caixaArredondada(1.7, 0.12, 0.5, 0.05, 2), matMad);
+          assento.position.y = 0.48;
+          bg.add(assento);
+          const encosto = new Mesh(Mat.caixaArredondada(1.7, 0.42, 0.1, 0.04, 2), matMad);
+          encosto.position.set(0, 0.74, -0.2);
+          bg.add(encosto);
+          const matFerro = new MeshStandardMaterial({ color: new Color('#3a4a44'), roughness: 0.5, metalness: 0.5 });
+          for (const x of [-0.7, 0.7]) {
+            const pe = new Mesh(new BoxGeometry(0.08, 0.48, 0.44), matFerro);
+            pe.position.set(x, 0.24, 0);
+            bg.add(pe);
+          }
+          bg.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+          return bg;
+        });
+        // do lado do lago, virado para a água
+        b.position.set(-7.4, 0, r.entre(2, BLOCO - 2));
+        b.rotation.y = -Math.PI / 2;
         g.add(b);
       }
     } else {
       // cada lado tem seu próprio cursor: as casas ficam encostadas umas nas
-      // outras formando a fileira, com larguras diferentes de cada lado
+      // outras formando a fileira, com larguras diferentes de cada lado.
+      // Onde há um marco no trajeto, a fileira abre a clareira dele.
       for (const lado of [-1, 1]) {
         let z = 0;
         while (z < BLOCO) {
           const p = predio(r, fachadas, lado);
+          const zMundo = z0 + z + p.largura / 2;
+          // o prédio é sorteado de qualquer jeito para o sorteio seguir
+          // determinístico; só não entra na cena se cair numa clareira
+          if (naClareira(zMundo, lado, p.largura / 2)) {
+            z += p.largura;
+            continue;
+          }
           p.grupo.position.z = z + p.largura / 2;
           g.add(p.grupo);
           z += p.largura;
@@ -873,15 +1343,23 @@ export function criarMundo(cena, renderer, fase, preset) {
       // adereços, encostados no meio-fio e não na parede — assim ficam
       // legíveis como objetos na calçada em vez de manchas na fachada
       if (r.chance(0.45)) {
-        const c = prop('cabine', fazCabineTelefonica);
-        c.position.set((r.chance(0.5) ? -1 : 1) * r.entre(5.6, 6.4), 0.16, r.entre(2, BLOCO - 2));
-        c.rotation.y = r.entre(-0.35, 0.35);
-        g.add(c);
+        const lado = r.chance(0.5) ? -1 : 1;
+        const zl = r.entre(2, BLOCO - 2);
+        if (!naClareira(z0 + zl, lado, 1)) {
+          const c = prop('cabine', fazCabineTelefonica);
+          c.position.set(lado * r.entre(5.6, 6.4), 0.16, zl);
+          c.rotation.y = r.entre(-0.35, 0.35);
+          g.add(c);
+        }
       }
       if (r.chance(0.4)) {
-        const cx = prop('correio', fazCaixaCorreio);
-        cx.position.set((r.chance(0.5) ? -1 : 1) * r.entre(5.5, 6.1), 0.16, r.entre(2, BLOCO - 2));
-        g.add(cx);
+        const lado = r.chance(0.5) ? -1 : 1;
+        const zl = r.entre(2, BLOCO - 2);
+        if (!naClareira(z0 + zl, lado, 1)) {
+          const cx = prop('correio', fazCaixaCorreio);
+          cx.position.set(lado * r.entre(5.5, 6.1), 0.16, zl);
+          g.add(cx);
+        }
       }
 
       // carrinhos estacionados: dão cor e escala à rua sem entrar nas faixas
@@ -890,8 +1368,10 @@ export function criarMundo(cena, renderer, fase, preset) {
       for (let i = 0; i < quantosCarros; i++) {
         const lado = r.chance(0.5) ? -1 : 1;
         const cor = CORES_CARRO[r.inteiro(0, CORES_CARRO.length - 1)];
+        const zl = r.entre(1, BLOCO - 3);
+        if (naClareira(z0 + zl, lado, 2)) continue;
         const carro = prop('carro' + cor, () => fazCarrinho(cor));
-        carro.position.set(lado * r.entre(FAIXA_CARRO - 0.2, FAIXA_CARRO + 0.2), 0, r.entre(1, BLOCO - 3));
+        carro.position.set(lado * r.entre(FAIXA_CARRO - 0.2, FAIXA_CARRO + 0.2), 0, zl);
         carro.rotation.y = lado > 0 ? 0.04 : Math.PI - 0.04;
         g.add(carro);
       }
@@ -917,7 +1397,12 @@ export function criarMundo(cena, renderer, fase, preset) {
     blocos.push(registro);
   }
 
-  /* marcos distantes */
+  /* marcos parados no trajeto, pelos quais ela realmente passa */
+  const pontosGrupo = new Group();
+  grupo.add(pontosGrupo);
+  const pontos = criarPontos(fase, pontosGrupo);
+
+  /* marcos distantes, de pano de fundo */
   const marcos = new Group();
   cena.add(marcos);
   const marcosDef = [];
@@ -1022,6 +1507,13 @@ export function criarMundo(cena, renderer, fase, preset) {
       if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); }
     });
     fachadas.forEach((f) => f.material.dispose());
+    // os marcos do trajeto têm geometria e material próprios, criados uma vez
+    pontosGrupo.traverse((o) => {
+      if (o.isMesh) {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
+      }
+    });
     limparProps();
 
     marcos.traverse((o) => {
@@ -1030,5 +1522,5 @@ export function criarMundo(cena, renderer, fase, preset) {
     cena.environment = null;
   }
 
-  return { grupo, atualizar, dispose, sol, ceu, blocos, chuva };
+  return { grupo, atualizar, dispose, sol, ceu, blocos, chuva, pontos };
 }

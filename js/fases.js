@@ -94,15 +94,19 @@ export const FASES = [
     lojas: true, coresLoja: ['#c02a3e', '#2f7a68', '#3f5a9c', '#8a5aa8', '#d08a2a'],
     coresPorta: ['#2f5a8c', '#1f6b52', '#8e2436', '#3c3160', '#c07a1e', '#1d1b22'],
 
-    marcos: [
-      { tipo: 'bigben', x: -20, distancia: 178, escala: 1.35 },
-      { tipo: 'parlamento', x: -78, distancia: 250, escala: 1 },
-      { tipo: 'roda', x: 34, distancia: 260, escala: 1 },
+    // Marcos por onde ela PASSA: a fileira de casas abre uma clareira do lado
+    // esquerdo e ali ficam o Parlamento, de fachada comprida rente à rua, e o
+    // Big Ben na ponta norte dele — como na cidade de verdade.
+    pontos: [
+      { tipo: 'parlamento', x: -64, z: 560, rot: Math.PI / 2, escala: 0.72,
+        claro: 420, lado: -1, piso: 'praca' },
+      { tipo: 'bigben', x: -34, z: 462, escala: 0.9,
+        legenda: 'Big Ben. Marcando o tempo que a gente já ganhou.', aviso: 190 },
     ],
 
     padroes: PADROES_RUA,
     camera: { exposicao: 0.94, bloom: 0.5, vinheta: 0.3, grao: 0.004, gotas: 0.5, aberracao: 0,
-               dof: 0.8, dofPerto: 26, dofLonge: 140,
+               dof: 0.78, dofPerto: 32, dofLonge: 270,
                contraste: 0.24, saturacao: 1.2, veu: 0.1 },
     som: { chuva: 1, vento: 0.5, acorde: [130.81, 196, 246.94] },
   },
@@ -135,12 +139,15 @@ export const FASES = [
     chuva: 0.12, corChuva: '#ffe4c0', vento: [-0.5, 0],
     molhado: 0.8, pedra: false,
     coresFolhagem: ['#b4671f', '#c98a2a', '#8c4f1c', '#6f7a2a', '#a8551a', '#d19a34'],
-    corAgua: '#5aa3b4',
+    corAgua: '#2f89a3',
 
     coresPredio: ['#7a6a58'],
     janelasAcesas: 0, lojas: false,
 
-    marcos: [{ tipo: 'roda', x: -46, distancia: 205, escala: 0.85 }],
+    pontos: [
+      { tipo: 'roda', x: -40, z: 470, escala: 0.85,
+        legenda: 'A roda parada no alto, como quem também não quer que acabe.', aviso: 130 },
+    ],
 
     padroes: PADROES_PARQUE,
     camera: { exposicao: 0.9, bloom: 0.6, vinheta: 0.26, grao: 0.004, gotas: 0.14, aberracao: 0,
@@ -182,7 +189,13 @@ export const FASES = [
     lojas: true, coresLoja: ['#c02a3e', '#2f6a78', '#5a4180', '#b06a24'],
     coresPorta: ['#2f5a8c', '#1f6b52', '#8e2436', '#3c3160', '#1d1b22'],
 
-    marcos: [{ tipo: 'bigben', x: 22, distancia: 210, escala: 0.95 }],
+    pontos: [
+      { tipo: 'ponte', x: 0, z: 396, escala: 1, claro: 176, lado: 0, piso: 'agua',
+        // a travessia é um momento, não um teste: nada de obstáculo em cima da ponte
+        limpo: 62,
+        legenda: 'Tower Bridge. Do outro lado do rio já dá para ver a agência.', aviso: 110 },
+    ],
+    corRio: '#2c6b80',
 
     padroes: PADROES_NOITE,
     camera: { exposicao: 1.05, bloom: 0.85, vinheta: 0.38, grao: 0.005, gotas: 0.42, aberracao: 0,
@@ -227,8 +240,19 @@ export function gerarTrajeto(fase) {
     z += padrao.comp + folga;
   }
 
-  encaixarEnvelopes(fase, itens, r);
-  return itens;
+  // Trechos que são momento, não desafio: a travessia da ponte fica sem
+  // obstáculo. Filtrar aqui em vez de na hora de instanciar mantém o
+  // validador vendo o trajeto de verdade.
+  const limpos = (fase.pontos || [])
+    .filter((p) => p.limpo)
+    .map((p) => ({ de: p.z - p.limpo / 2, ate: p.z + p.limpo / 2 }));
+  const filtrado = itens.filter((it) => {
+    if (COMO_PASSAR[it.tipo] === 'livre') return true;
+    return !limpos.some((c) => it.z > c.de && it.z < c.ate);
+  });
+
+  encaixarEnvelopes(fase, filtrado, r);
+  return filtrado;
 }
 
 function ocupacao(itens, z, faixa) {
