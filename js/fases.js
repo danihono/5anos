@@ -195,6 +195,10 @@ export const FASES = [
     corCeuLuz: '#4a5c96', corChaoLuz: '#3e3442', forcaHemisferio: 0.88,
     corPoste: '#ffc070', forcaPoste: 24,
     sombra: 0.5,
+    /* A luz que acompanha ela. Existe desde o começo em jogo.js e nunca tinha
+       sido ligada em fase nenhuma. Agora que ela veste couro preto, é o que
+       impede a protagonista de virar uma silhueta perdida na rua noturna. */
+    luzHeroi: 5,
 
     // garoa discreta: contra o céu agora fundo, a chuva clara virava risco
     chuva: 0.3, corChuva: '#8ea3c6', vento: [-0.9, 0],
