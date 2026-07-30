@@ -138,11 +138,22 @@
   .mini.sel{border-color:var(--brass);color:var(--brass-hi);background:rgba(201,151,63,.12)}
 
   /* ───────── legenda da cutscene ───────── */
-  #legenda{position:fixed;left:0;right:0;bottom:14%;z-index:22;text-align:center;pointer-events:none;
-    opacity:0;transition:opacity 1s ease;padding:0 24px}
+  /* A Pinyon Script era linda e ilegível: caligráfica a 58px por cima de uma
+     cena em movimento. Agora o NOME do lugar vem no slab dos títulos e a frase
+     em Garamond encorpado, sem itálico, com um véu escuro atrás para descolar
+     do cenário. */
+  #legenda{position:fixed;left:0;right:0;bottom:12%;z-index:22;text-align:center;pointer-events:none;
+    opacity:0;transition:opacity .8s ease;padding:18px 24px}
   #legenda.on{opacity:1}
-  #legenda span{font-family:'Pinyon Script',cursive;font-size:clamp(30px,7vw,58px);
-    color:var(--cream);text-shadow:0 4px 24px rgba(0,0,0,.9),0 0 60px rgba(0,0,0,.7)}
+  #legenda::before{content:'';position:absolute;inset:-10% -6%;z-index:-1;
+    background:radial-gradient(ellipse at center,rgba(8,9,12,.72) 0%,rgba(8,9,12,.45) 45%,transparent 78%)}
+  #legenda .nome{font-family:'Alfa Slab One',serif;font-size:clamp(26px,5.4vw,46px);
+    line-height:1.05;color:var(--cream);letter-spacing:.01em;
+    text-shadow:0 3px 0 rgba(0,0,0,.35),0 6px 26px rgba(0,0,0,.9)}
+  #legenda .nome:empty{display:none}
+  #legenda .frase{margin-top:10px;font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;
+    font-size:clamp(17px,2.9vw,27px);line-height:1.35;color:#f6ecd8;
+    text-shadow:0 2px 14px rgba(0,0,0,.95),0 0 34px rgba(0,0,0,.8)}
 
   /* ───────── fade preto ───────── */
   #fade{position:fixed;inset:0;z-index:70;background:#000;pointer-events:none;opacity:0;
@@ -198,7 +209,7 @@
 </div></div>
 
 <!-- ═════ legenda ═════ -->
-<div id="legenda"><span></span></div>
+<div id="legenda"><div class="nome"></div><div class="frase"></div></div>
 
 <!-- ═════ pausa ═════ -->
 <div class="camada" id="pausa" hidden><div class="caixa">
@@ -2183,14 +2194,28 @@ function criarMenina(aparencia = APARENCIA) {
       pernaE.tornozelo.rotation.x = -pernaE.joelho.rotation.x * 0.35;
       pernaD.tornozelo.rotation.x = -pernaD.joelho.rotation.x * 0.35;
 
-      /* Braços de corredor: cotovelo travado perto de 90° e a mão cruzando um
-         pouco na frente do corpo, em vez de balançar reto ao lado. */
-      bracoE.g.rotation.x = -s * 0.95 * amp;
-      bracoD.g.rotation.x = s * 0.95 * amp;
-      bracoE.cotovelo.rotation.x = (1.15 + Math.max(0, s) * 0.5) * amp;
-      bracoD.cotovelo.rotation.x = (1.15 + Math.max(0, -s) * 0.5) * amp;
-      bracoE.g.rotation.z = 0.16 + Math.max(0, -s) * 0.24 * amp;
-      bracoD.g.rotation.z = -0.16 - Math.max(0, s) * 0.24 * amp;
+      /* Braços de corredor. Três defeitos consertados aqui de uma vez, e os três
+         eram meus:
+
+         - O ângulo LATERAL oscilava (`0.16 + max(0,-s) * 0.24`), então os braços
+           abriam e fechavam para os lados a cada passada. Ninguém corre assim:
+           o braço fica num plano quase reto e quem gira é o ombro. Agora o Z é
+           constante.
+         - `Math.max(0, s)` aparecia três vezes e cria um bico na derivada — o
+           movimento travava no meio do ciclo e arrancava de novo. Era isso o
+           "estranho". Trocado por seno e cosseno puros, que são lisos.
+         - A base do cotovelo era multiplicada por `amp`, então em velocidade
+           baixa o braço esticava. Quem corre mantém perto de 90° sempre; só a
+           variação deve escalar com a velocidade. */
+      bracoE.g.rotation.x = -s * 0.62 * amp;
+      bracoD.g.rotation.x = s * 0.62 * amp;
+      bracoE.cotovelo.rotation.x = 1.25 + s * 0.3 * amp;
+      bracoD.cotovelo.rotation.x = 1.25 - s * 0.3 * amp;
+      bracoE.g.rotation.z = 0.13;
+      bracoD.g.rotation.z = -0.13;
+      // o antebraço chega um pouco atrasado, senão o gesto fica de robô
+      bracoE.cotovelo.rotation.y = -c * 0.12 * amp;
+      bracoD.cotovelo.rotation.y = c * 0.12 * amp;
 
       /* Voo. O corpo sobe duas vezes por ciclo (uma por passada) e o pico é
          alto o bastante para ler como corrida — 4,5 cm não lia como nada. */
@@ -3372,6 +3397,7 @@ function criarPontos(fase, alvo, preset, telas = []) {
       lista.push({
         z: p.z,
         legenda: p.legenda || null,
+        nome: p.nome || '',
         aviso: p.aviso ?? 60,
         olhada: p.olhada || null,
         badalada: !!p.badalada,
@@ -4889,7 +4915,8 @@ const FASES = [
        dentro do quadro. */
     pontos: [
       { tipo: 'piccadilly', x: 0, z: 466, claro: 190, lado: 1,
-        legenda: 'Piccadilly Circus. A cidade acordando com as luzes ainda acesas.',
+        nome: 'Piccadilly Circus',
+        legenda: 'A cidade acordando com as luzes ainda acesas.',
         aviso: 150,
         /* A fachada fica em z≈498, à frente e à esquerda, virada para dentro do
            cruzamento. No auge (dist ≈ 470) ela está a uns 60 m: ocupa metade da
@@ -4958,6 +4985,7 @@ const FASES = [
          O `recuo` de 18 é o que devolve folga para ela: afastando a câmera, o
          ângulo dela abaixo do horizonte encolhe junto. */
       { tipo: 'roda', x: -60, z: 470, escala: 1.2,
+        nome: 'London Eye',
         legenda: 'A roda parada no alto, como quem também não quer que acabe.',
         aviso: 145,
         olhada: { de: 330, ate: 440, fov: 70, recuo: 18, subida: 1.2,
@@ -5032,7 +5060,8 @@ const FASES = [
          hora de olhar. De z=100 a z=560, com o Parlamento inteiro dentro. */
       { tipo: 'bigben', x: -34, z: 330, escala: 0.92, noturno: true, badalada: true,
         claro: 460, lado: -1, piso: 'praca', larguraPiso: 56, rio: true,
-        legenda: 'O Big Ben. O lugar preferido dela, aceso só para ela passar.',
+        nome: 'Big Ben',
+        legenda: 'O lugar preferido dela, aceso só para ela passar.',
         aviso: 210,
         /* Enquadramento medido, não chutado. A câmera fica a 4,05 m do chão e
            20,6 m atrás dela, mirando a 38 m de altura na torre. No auge da
@@ -5049,7 +5078,8 @@ const FASES = [
       { tipo: 'ponte', x: 0, z: 620, escala: 1, claro: 176, lado: 0, piso: 'agua',
         // a travessia é um momento, não um teste: nada de obstáculo em cima da ponte
         limpo: 62,
-        legenda: 'Tower Bridge. Do outro lado do rio já dá para ver a agência.', aviso: 110 },
+        nome: 'Tower Bridge',
+        legenda: 'Do outro lado do rio já dá para ver a agência.', aviso: 110 },
     ],
     corRio: '#2c6b80',
 
@@ -5724,10 +5754,13 @@ function iniciar() {
     trocando = false;
   }
 
-  function dizerLegenda(texto, ms) {
-    elLegenda.querySelector('span').textContent = texto;
+  /** `nome` é opcional: sem ele a legenda é só a frase, como nas aberturas. */
+  function dizerLegenda(texto, ms, nome = '') {
+    elLegenda.querySelector('.nome').textContent = nome;
+    elLegenda.querySelector('.frase').textContent = texto;
     elLegenda.classList.add('on');
-    setTimeout(() => elLegenda.classList.remove('on'), ms);
+    clearTimeout(dizerLegenda.tempo);
+    dizerLegenda.tempo = setTimeout(() => elLegenda.classList.remove('on'), ms);
   }
 
   const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -5922,7 +5955,10 @@ function iniciar() {
        metade da tela virava calçada vazia com a menina pequena no meio. Subindo
        a mira na mesma proporção, o quadro ganha cenário em cima em vez de piso
        embaixo, e ela volta a ocupar o lugar certo. */
-    const subidaRetrato = (camera.fov - FOV_BASE) * 0.055;
+    // sai da PROPORÇÃO da tela, não do fov corrente: durante uma olhada o fov
+    // fecha (46 no Piccadilly), e usar ele aqui baixava a mira bem na hora do
+    // enquadramento do marco
+    const subidaRetrato = (fovVertical(FOV_BASE, camera.aspect) - FOV_BASE) * 0.055;
     alvoOlhar.set(estado.x * 0.35,
       1.45 + subidaRetrato - (estado.agachado ? 0.2 : 0), estado.dist + 9);
 
@@ -6072,7 +6108,7 @@ function iniciar() {
       for (const p of mundo.pontos) {
         if (p.legenda && !p.mostrada && estado.dist > p.z - p.aviso) {
           p.mostrada = true;
-          dizerLegenda(p.legenda, 4400);
+          dizerLegenda(p.legenda, 5200, p.nome || '');
         }
         // os sinos tocam quando ela entra na janela da olhada, e só uma vez:
         // se morrer e voltar ao checkpoint, não repetem

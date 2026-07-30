@@ -116,7 +116,8 @@ export const FASES = [
        dentro do quadro. */
     pontos: [
       { tipo: 'piccadilly', x: 0, z: 466, claro: 190, lado: 1,
-        legenda: 'Piccadilly Circus. A cidade acordando com as luzes ainda acesas.',
+        nome: 'Piccadilly Circus',
+        legenda: 'A cidade acordando com as luzes ainda acesas.',
         aviso: 150,
         /* A fachada fica em z≈498, à frente e à esquerda, virada para dentro do
            cruzamento. No auge (dist ≈ 470) ela está a uns 60 m: ocupa metade da
@@ -185,6 +186,7 @@ export const FASES = [
          O `recuo` de 18 é o que devolve folga para ela: afastando a câmera, o
          ângulo dela abaixo do horizonte encolhe junto. */
       { tipo: 'roda', x: -60, z: 470, escala: 1.2,
+        nome: 'London Eye',
         legenda: 'A roda parada no alto, como quem também não quer que acabe.',
         aviso: 145,
         olhada: { de: 330, ate: 440, fov: 70, recuo: 18, subida: 1.2,
@@ -259,7 +261,8 @@ export const FASES = [
          hora de olhar. De z=100 a z=560, com o Parlamento inteiro dentro. */
       { tipo: 'bigben', x: -34, z: 330, escala: 0.92, noturno: true, badalada: true,
         claro: 460, lado: -1, piso: 'praca', larguraPiso: 56, rio: true,
-        legenda: 'O Big Ben. O lugar preferido dela, aceso só para ela passar.',
+        nome: 'Big Ben',
+        legenda: 'O lugar preferido dela, aceso só para ela passar.',
         aviso: 210,
         /* Enquadramento medido, não chutado. A câmera fica a 4,05 m do chão e
            20,6 m atrás dela, mirando a 38 m de altura na torre. No auge da
@@ -276,7 +279,8 @@ export const FASES = [
       { tipo: 'ponte', x: 0, z: 620, escala: 1, claro: 176, lado: 0, piso: 'agua',
         // a travessia é um momento, não um teste: nada de obstáculo em cima da ponte
         limpo: 62,
-        legenda: 'Tower Bridge. Do outro lado do rio já dá para ver a agência.', aviso: 110 },
+        nome: 'Tower Bridge',
+        legenda: 'Do outro lado do rio já dá para ver a agência.', aviso: 110 },
     ],
     corRio: '#2c6b80',
 

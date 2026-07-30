@@ -541,10 +541,13 @@ export function iniciar() {
     trocando = false;
   }
 
-  function dizerLegenda(texto, ms) {
-    elLegenda.querySelector('span').textContent = texto;
+  /** `nome` é opcional: sem ele a legenda é só a frase, como nas aberturas. */
+  function dizerLegenda(texto, ms, nome = '') {
+    elLegenda.querySelector('.nome').textContent = nome;
+    elLegenda.querySelector('.frase').textContent = texto;
     elLegenda.classList.add('on');
-    setTimeout(() => elLegenda.classList.remove('on'), ms);
+    clearTimeout(dizerLegenda.tempo);
+    dizerLegenda.tempo = setTimeout(() => elLegenda.classList.remove('on'), ms);
   }
 
   const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -739,7 +742,10 @@ export function iniciar() {
        metade da tela virava calçada vazia com a menina pequena no meio. Subindo
        a mira na mesma proporção, o quadro ganha cenário em cima em vez de piso
        embaixo, e ela volta a ocupar o lugar certo. */
-    const subidaRetrato = (camera.fov - FOV_BASE) * 0.055;
+    // sai da PROPORÇÃO da tela, não do fov corrente: durante uma olhada o fov
+    // fecha (46 no Piccadilly), e usar ele aqui baixava a mira bem na hora do
+    // enquadramento do marco
+    const subidaRetrato = (fovVertical(FOV_BASE, camera.aspect) - FOV_BASE) * 0.055;
     alvoOlhar.set(estado.x * 0.35,
       1.45 + subidaRetrato - (estado.agachado ? 0.2 : 0), estado.dist + 9);
 
@@ -889,7 +895,7 @@ export function iniciar() {
       for (const p of mundo.pontos) {
         if (p.legenda && !p.mostrada && estado.dist > p.z - p.aviso) {
           p.mostrada = true;
-          dizerLegenda(p.legenda, 4400);
+          dizerLegenda(p.legenda, 5200, p.nome || '');
         }
         // os sinos tocam quando ela entra na janela da olhada, e só uma vez:
         // se morrer e voltar ao checkpoint, não repetem

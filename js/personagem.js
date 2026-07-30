@@ -265,14 +265,28 @@ export function criarMenina(aparencia = APARENCIA) {
       pernaE.tornozelo.rotation.x = -pernaE.joelho.rotation.x * 0.35;
       pernaD.tornozelo.rotation.x = -pernaD.joelho.rotation.x * 0.35;
 
-      /* Braços de corredor: cotovelo travado perto de 90° e a mão cruzando um
-         pouco na frente do corpo, em vez de balançar reto ao lado. */
-      bracoE.g.rotation.x = -s * 0.95 * amp;
-      bracoD.g.rotation.x = s * 0.95 * amp;
-      bracoE.cotovelo.rotation.x = (1.15 + Math.max(0, s) * 0.5) * amp;
-      bracoD.cotovelo.rotation.x = (1.15 + Math.max(0, -s) * 0.5) * amp;
-      bracoE.g.rotation.z = 0.16 + Math.max(0, -s) * 0.24 * amp;
-      bracoD.g.rotation.z = -0.16 - Math.max(0, s) * 0.24 * amp;
+      /* Braços de corredor. Três defeitos consertados aqui de uma vez, e os três
+         eram meus:
+
+         - O ângulo LATERAL oscilava (`0.16 + max(0,-s) * 0.24`), então os braços
+           abriam e fechavam para os lados a cada passada. Ninguém corre assim:
+           o braço fica num plano quase reto e quem gira é o ombro. Agora o Z é
+           constante.
+         - `Math.max(0, s)` aparecia três vezes e cria um bico na derivada — o
+           movimento travava no meio do ciclo e arrancava de novo. Era isso o
+           "estranho". Trocado por seno e cosseno puros, que são lisos.
+         - A base do cotovelo era multiplicada por `amp`, então em velocidade
+           baixa o braço esticava. Quem corre mantém perto de 90° sempre; só a
+           variação deve escalar com a velocidade. */
+      bracoE.g.rotation.x = -s * 0.62 * amp;
+      bracoD.g.rotation.x = s * 0.62 * amp;
+      bracoE.cotovelo.rotation.x = 1.25 + s * 0.3 * amp;
+      bracoD.cotovelo.rotation.x = 1.25 - s * 0.3 * amp;
+      bracoE.g.rotation.z = 0.13;
+      bracoD.g.rotation.z = -0.13;
+      // o antebraço chega um pouco atrasado, senão o gesto fica de robô
+      bracoE.cotovelo.rotation.y = -c * 0.12 * amp;
+      bracoD.cotovelo.rotation.y = c * 0.12 * amp;
 
       /* Voo. O corpo sobe duas vezes por ciclo (uma por passada) e o pico é
          alto o bastante para ler como corrida — 4,5 cm não lia como nada. */

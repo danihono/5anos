@@ -616,6 +616,7 @@ function criarPontos(fase, alvo, preset, telas = []) {
       lista.push({
         z: p.z,
         legenda: p.legenda || null,
+        nome: p.nome || '',
         aviso: p.aviso ?? 60,
         olhada: p.olhada || null,
         badalada: !!p.badalada,
