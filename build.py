@@ -204,6 +204,22 @@ def main():
         demo = saida.replace("<body>", "<body>\n<script>window.__soOJogo=1;</script>", 1)
         if demo == saida:
             sys.exit("[build] não achei o <body> para marcar a versão de demonstração")
+
+        # Fontes embutidas: publicado como Artifact, o CSP corta domínio
+        # externo e o Google Fonts nunca chega. O texto continua legível nas
+        # fontes de reserva, mas a demo existe para mostrar o presente como
+        # ele é — então aqui elas viajam junto.
+        fontes = RAIZ / "vendor/fontes-embutidas.css"
+        if fontes.exists():
+            demo = re.sub(
+                r'<link rel="preconnect"[^>]*fonts\.googleapis[^>]*>\s*'
+                r'<link href="https://fonts\.googleapis\.com[^"]*"[^>]*>',
+                "<style>\n" + fontes.read_text(encoding="utf-8") + "</style>",
+                demo, count=1)
+            if "fonts.googleapis.com" in demo:
+                sys.exit("[build] não consegui trocar o link das fontes pelas embutidas")
+        else:
+            print("[build] aviso: sem vendor/fontes-embutidas.css, a demo vai cair nas fontes de reserva")
         (RAIZ / "index-demo.html").write_text(demo, encoding="utf-8")
         print(f"[build] index-demo.html gerado — o final mostra um cartão em vez de ir para as cartas")
 
