@@ -118,11 +118,13 @@ export const FASES = [
       { tipo: 'piccadilly', x: 0, z: 466, claro: 190, lado: 1,
         legenda: 'Piccadilly Circus. A cidade acordando com as luzes ainda acesas.',
         aviso: 150,
-        /* fov 46, mais FECHADO que os 54 de base: aqui o marco é largo e baixo,
-           não uma torre de 100 m, então o que ele precisa é de aproximação e
-           não de espaço vertical. Abrir para 66 tinha afastado tudo. */
-        olhada: { de: 320, ate: 450, fov: 46, recuo: 15, subida: 1.6,
-                  mira: [26, 14, 466], dofPerto: 120, dofLonge: 480 } },
+        /* A fachada fica em z≈498, à frente e à esquerda, virada para dentro do
+           cruzamento. No auge (dist ≈ 470) ela está a uns 60 m: ocupa metade da
+           altura da tela, com a menina ainda no quadro. fov 50, um pouco mais
+           fechado que os 54 de base — aqui o marco é largo, então precisa de
+           aproximação e não de espaço vertical. */
+        olhada: { de: 360, ate: 500, fov: 50, recuo: 12, subida: 1.6,
+                  mira: [24, 14, 498], dofPerto: 120, dofLonge: 480 } },
     ],
 
     padroes: PADROES_RUA,

@@ -1144,90 +1144,136 @@ function fazRodaGigante() {
 function fazPiccadilly(fase) {
   const g = new Group();
   const matPedra = new MeshStandardMaterial({ color: new Color('#c9bfae'), roughness: 0.9 });
-  const matEscuro = new MeshStandardMaterial({ color: new Color('#2b2a30'), roughness: 0.8 });
+  const matEscuro = new MeshStandardMaterial({ color: new Color('#26252b'), roughness: 0.8 });
+  const matVitrine = new MeshStandardMaterial({
+    color: new Color('#ffe7bd'), emissive: new Color('#ffca7a'),
+    emissiveIntensity: 1.7, roughness: 1,
+  });
 
-  // chão da praça — começa na borda da calçada (x=9) e não atravessa a rua
-  const chao = new Mesh(new PlaneGeometry(64, 130),
-    materialChao(Mat.calcada(fase.molhado, fase.semente + 77), [16, 32], '#8f9298'));
+  // o asfalto largo do cruzamento
+  const chao = new Mesh(new PlaneGeometry(76, 128),
+    materialChao(Mat.asfalto(fase.molhado, fase.semente + 77), [12, 20], '#7c8087'));
   chao.rotation.x = -Math.PI / 2;
-  chao.position.set(41, 0.16, 0);
+  chao.position.set(36, 0.15, 0);
   chao.receiveShadow = true;
   g.add(chao);
 
-  /* O paredão de telões. Um arco de verdade virava metade dos painéis de
-     costas para quem vem pela rua — o primeiro desenho tinha 1,5 rad de
-     abertura e só um painel aparecia. Aqui eles ficam quase todos de frente
-     para ela, com um leque de meio radiano só para dar a curva da esquina. */
-  const CORES = ['#ff2f6d', '#22d3ee', '#ffd23f', '#7c5cff', '#ff7a1a', '#2fe08a'];
+  /* A FACHADA. Uma só, girada para olhar para dentro do cruzamento e não para
+     quem vem pela rua — era essa a queixa do Daniel sobre a primeira versão,
+     que eram sete torres separadas todas apontadas para a frente. */
+  const fachada = new Group();
+  fachada.position.set(26, 0, 32);
+  fachada.rotation.y = Math.PI + 0.62;
+  g.add(fachada);
+
+  const LARG = 34, ALT = 26;
+  const predio = new Mesh(new BoxGeometry(LARG, ALT + 8, 14), matPedra);
+  predio.position.set(0, (ALT + 8) / 2, -7.4);
+  predio.castShadow = true;
+  fachada.add(predio);
+  // o painel preto onde os telões são montados
+  const fundo = new Mesh(new BoxGeometry(LARG - 1, ALT - 4, 0.6), matEscuro);
+  fundo.position.set(0, 6 + (ALT - 4) / 2, -0.3);
+  fachada.add(fundo);
+
+  /* O mosaico. É a IRREGULARIDADE que faz reconhecer o Piccadilly: um painel
+     enorme, um alto e estreito ao lado, outro grande do outro lado e uma
+     fileira de menores embaixo. Três faixas iguais nunca iam ler como o lugar.
+     Cada linha é [x, y, largura, altura] em fração da parede. */
+  const MOSAICO = [
+    [0.02, 0.52, 0.42, 0.44, '#1f4fd8'],
+    [0.46, 0.74, 0.20, 0.22, '#e8b33a'],
+    [0.46, 0.52, 0.20, 0.20, '#d9d4c8'],
+    [0.68, 0.52, 0.30, 0.44, '#e01b2e'],
+    [0.02, 0.28, 0.30, 0.22, '#20c0d8'],
+    [0.34, 0.28, 0.30, 0.22, '#7c5cff'],
+    [0.66, 0.28, 0.32, 0.22, '#2f9ee0'],
+    [0.02, 0.06, 0.22, 0.20, '#ff7a1a'],
+    [0.26, 0.06, 0.30, 0.20, '#2fe08a'],
+    [0.58, 0.06, 0.18, 0.20, '#ff2f6d'],
+    [0.78, 0.06, 0.20, 0.20, '#ffd23f'],
+  ];
   const painel = [];
-  for (let i = 0; i < 7; i++) {
-    const t = i / 6;
-    const pz = -26 + t * 52;
-    const px = 21 + Math.abs(t - 0.5) * 11;      // curva rasa, bojo para a rua
-    const a = (t - 0.5) * 0.5 - Math.PI / 2;     // usado só para virar o painel
-
-    // a fachada atrás do painel — escura e mais baixa, para o telão ser o herói
-    const parede = new Mesh(new BoxGeometry(9, 22, 5), matEscuro);
-    parede.position.set(px, 11, pz);
-    parede.rotation.y = -a + Math.PI / 2;
-    parede.castShadow = true;
-    g.add(parede);
-
-    /* O telão vai no +z LOCAL da parede. Rodada de ~180°, é essa a face que
-       olha para quem vem pela rua — na primeira tentativa eu pus em -z e os
-       sete telões ficaram todos escondidos atrás das próprias paredes. */
-    const tela = new Group();
-    tela.position.set(px, 13, pz);
-    tela.rotation.y = -a + Math.PI / 2;
-    g.add(tela);
-    const moldura = new Mesh(new BoxGeometry(8.6, 14, 0.5), matEscuro);
-    moldura.position.z = 2.6;
-    tela.add(moldura);
-    for (let f = 0; f < 3; f++) {
-      const cor = CORES[(i * 2 + f) % CORES.length];
-      const faixa = new Mesh(new BoxGeometry(7.8, 4, 0.3), new MeshStandardMaterial({
-        color: new Color(cor), emissive: new Color(cor), emissiveIntensity: 2.6, roughness: 1,
-      }));
-      faixa.position.set(0, 4.4 - f * 4.4, 2.95);
-      tela.add(faixa);
-      painel.push(faixa);
-    }
-    // a luz que o telão joga na praça — é o que prova que ele está aceso
-    if (i % 3 === 1) {
-      const brilho = new PointLight(new Color(CORES[i % CORES.length]), 90, 40, 1.7);
-      brilho.position.set(px - 3, 12, pz - 3);
-      g.add(brilho);
-    }
+  const BASE = 6;                      // os telões começam acima das lojas
+  const ALTURA_TELA = ALT - 5;
+  for (const [fx, fy, fw, fh, cor] of MOSAICO) {
+    const w = fw * (LARG - 2), h = fh * ALTURA_TELA;
+    const px = (fx + fw / 2) * (LARG - 2) - (LARG - 2) / 2;
+    const py = BASE + fy * ALTURA_TELA + h / 2 - ALTURA_TELA * 0.03;
+    const tela = new Mesh(new BoxGeometry(w - 0.35, h - 0.35, 0.35), new MeshStandardMaterial({
+      color: new Color(cor), emissive: new Color(cor), emissiveIntensity: 2.4, roughness: 1,
+    }));
+    tela.position.set(px, py, 0.25);
+    fachada.add(tela);
+    painel.push(tela);
   }
 
-  /* A fonte do Eros, embaixo dos telões. Degraus, taça e a figura alada. */
+  // térreo: marquise e vitrines acesas, como na foto
+  const marquise = new Mesh(new BoxGeometry(LARG - 1, 0.6, 3), matEscuro);
+  marquise.position.set(0, 5.4, 1.4);
+  fachada.add(marquise);
+  for (let i = 0; i < 6; i++) {
+    const v = new Mesh(new BoxGeometry(4, 3.4, 0.3), matVitrine);
+    v.position.set(-LARG / 2 + 3.4 + i * 5.6, 2.6, 0.3);
+    fachada.add(v);
+  }
+
+  // a luz que os telões jogam no cruzamento: é o que prova que estão acesos
+  for (const [dx, cor] of [[-10, '#2f6ad8'], [10, '#e01b2e']]) {
+    const brilho = new PointLight(new Color(cor), 130, 58, 1.7);
+    brilho.position.set(30 + dx, 15, 22);
+    g.add(brilho);
+  }
+
+  /* A fonte do Eros, numa ilha à frente da fachada — na foto ela fica solta no
+     meio do cruzamento, não encostada no prédio. */
   const fonte = new Group();
-  fonte.position.set(26, 0.16, -14);
+  fonte.position.set(23, 0.15, -16);
   g.add(fonte);
+  const ilha = new Mesh(new CylinderGeometry(7.5, 7.8, 0.35, 20), matPedra);
+  ilha.receiveShadow = true;
+  fonte.add(ilha);
   for (let i = 0; i < 3; i++) {
-    const deg = new Mesh(new CylinderGeometry(5.4 - i * 1.1, 5.8 - i * 1.1, 0.45, 18), matPedra);
-    deg.position.y = 0.22 + i * 0.45;
-    deg.receiveShadow = true;
+    const deg = new Mesh(new CylinderGeometry(4.6 - i * 1.1, 5 - i * 1.1, 0.42, 18), matPedra);
+    deg.position.y = 0.38 + i * 0.42;
     fonte.add(deg);
   }
-  const taca = new Mesh(new CylinderGeometry(2.5, 1.1, 1.5, 16), matPedra);
+  const taca = new Mesh(new CylinderGeometry(2.2, 1, 1.4, 16), matPedra);
   taca.position.y = 2.3;
   fonte.add(taca);
-  const pedestal = new Mesh(new CylinderGeometry(0.8, 1.2, 4, 12), matPedra);
-  pedestal.position.y = 4.6;
+  const pedestal = new Mesh(new CylinderGeometry(0.7, 1.1, 3.6, 12), matPedra);
+  pedestal.position.y = 4.4;
   fonte.add(pedestal);
   const matBronze = new MeshStandardMaterial({
     color: new Color('#8fa89b'), roughness: 0.4, metalness: 0.7,
   });
-  const eros = new Mesh(new CapsuleGeometry(0.5, 1.3, 5, 12), matBronze);
-  eros.position.y = 7.6;
+  const eros = new Mesh(new CapsuleGeometry(0.45, 1.2, 5, 12), matBronze);
+  eros.position.y = 7;
   eros.castShadow = true;
   fonte.add(eros);
   for (const lado of [-1, 1]) {
-    const asa = new Mesh(new BoxGeometry(0.18, 2.4, 1.1), matBronze);
-    asa.position.set(lado * 0.5, 8.4, -0.3);
+    const asa = new Mesh(new BoxGeometry(0.16, 2.2, 1), matBronze);
+    asa.position.set(lado * 0.45, 7.7, -0.3);
     asa.rotation.z = lado * 0.35;
     fonte.add(asa);
+  }
+
+  /* Ônibus atravessando o cruzamento e gente na calçada, reaproveitando o que
+     já existe em obstaculos.js. Sem isto a praça fica um pátio vazio, que era
+     a outra metade do problema. */
+  const r = sorteio(fase.semente + 909);
+  for (const [bx, bz, giro] of [[18, 20, 1.35], [30, -6, -0.5], [44, 12, 2.5]]) {
+    const bus = CONSTRUTORES.onibus().objeto;
+    bus.position.set(bx, 0, bz);
+    bus.rotation.y = giro;
+    g.add(bus);
+  }
+  for (let i = 0; i < 16; i++) {
+    const ped = CONSTRUTORES.pedestre(r).objeto;
+    const a = r.entre(0, TAU);
+    ped.position.set(24 + Math.cos(a) * r.entre(9, 24), 0.16, Math.sin(a) * r.entre(9, 30));
+    ped.rotation.y = r.entre(0, TAU);
+    g.add(ped);
   }
 
   // as faixas ficam guardadas no grupo: quem anima é o laço do mundo
