@@ -80,6 +80,13 @@ anéis e doze algarismos. A 150 m o mostrador tem uns 30 pixels: nada daquilo
 resolvia, e o que sobrava era a média — um disco azul apagado no lugar de um
 relógio aceso. Ficaram quatro raios, um anel e algarismos menores.
 
+E isso vale para **estrutura**, não só para desenho: caí na mesma armadilha na
+London Eye. O aro dela tinha 0,84 m de tubo, o que dá 1,5 pixel a 87 m — a roda
+lia bem de perto e lavava à distância, e eu passei um bom tempo achando que era
+cor. Não era: linha mais fina que um pixel não desenha, só acinzenta. Quando um
+marco tem que ser visto de longe, engrosse a bitola até ela sobreviver à
+distância, mesmo que de perto fique mais pesada do que seria fiel.
+
 **Empilhe por raio absoluto, não por fator.** As camadas do mostrador (moldura,
 painel, vidro, aro, treliça, ponteiros) têm espessura. Posicionar cada uma
 multiplicando o raio por 0.99, 1.01, 1.02 parecia certo e não era: a caixa do

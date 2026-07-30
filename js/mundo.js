@@ -1031,30 +1031,71 @@ function fazBalaustrada(comprimento, lado) {
   return g;
 }
 
+/**
+ * A London Eye. Trinta e duas cápsulas, como a de verdade, e a roda em
+ * balanço sobre a água — que é a assinatura dela: o A de sustentação fica em
+ * terra e o aro avança por cima do rio.
+ *
+ * O aço é prateado-azulado e não branco. A roda real é branca, mas a cena 2 é
+ * uma tarde dourada com o céu lavado em creme, e branco sobre creme não tem
+ * silhueta nenhuma — some, exatamente como o Big Ben sumia na cena 1. O tom
+ * frio lê como "aço branco na sombra" e devolve o desenho da estrutura.
+ */
 function fazRodaGigante() {
   const g = new Group();
-  const matAco = new MeshStandardMaterial({ color: new Color('#e8ecef'), roughness: 0.38, metalness: 0.45 });
+  const matAco = new MeshStandardMaterial({ color: new Color('#7d94a8'), roughness: 0.4, metalness: 0.45 });
+  const matAcoClaro = new MeshStandardMaterial({ color: new Color('#93a9bb'), roughness: 0.42, metalness: 0.4 });
   const matLuz = new MeshStandardMaterial({
-    color: new Color('#bfe6ff'), emissive: new Color('#6ec6ff'),
+    color: new Color('#d8f0ff'), emissive: new Color('#6ec6ff'),
     emissiveIntensity: 2.8, roughness: 1,
   });
-  const aro = new Mesh(new TorusGeometry(30, 0.7, 8, 60), matAco);
+  const CAPSULAS = 32;
+
+  /* Bitolas grossas de propósito. A menina vê a roda de 60 a 140 m, e nessa
+     faixa o tubo de 0,7 (0,84 depois da escala) dá 1,5 pixel: linha mais fina
+     que um pixel não desenha, só acinzenta. É a mesma armadilha da treliça do
+     relógio do Big Ben — a roda lia bem de perto e lavava a 87 m. */
+  const aro = new Mesh(new TorusGeometry(30, 1.3, 8, 60), matAco);
   aro.position.y = 33;
   g.add(aro);
+  // aro interno, onde os cabos se prendem
+  const aroInterno = new Mesh(new TorusGeometry(27.6, 0.6, 6, 48), matAcoClaro);
+  aroInterno.position.y = 33;
+  g.add(aroInterno);
   const aro2 = new Mesh(new TorusGeometry(30, 0.28, 6, 60), matLuz);
   aro2.position.y = 33;
   aro2.position.z = 1;
   g.add(aro2);
-  for (let i = 0; i < 24; i++) {
-    const ang = (i / 24) * TAU;
-    const raio = new Mesh(new CylinderGeometry(0.12, 0.12, 30, 5), matAco);
+
+  // cubo central
+  const cubo = new Mesh(new CylinderGeometry(1.9, 1.9, 5.4, 12), matAco);
+  cubo.rotation.x = Math.PI / 2;
+  cubo.position.y = 33;
+  g.add(cubo);
+
+  for (let i = 0; i < CAPSULAS; i++) {
+    const ang = (i / CAPSULAS) * TAU;
+    // cabos radiais finos, do cubo ao aro, como os raios de uma bicicleta
+    const raio = new Mesh(new CylinderGeometry(0.16, 0.16, 28, 4), matAcoClaro);
     raio.position.set(Math.cos(ang) * 15, 33 + Math.sin(ang) * 15, 0);
     raio.rotation.z = -ang + Math.PI / 2;
     g.add(raio);
-    const capsula = new Mesh(new SphereGeometry(1.1, 8, 6), matLuz);
-    capsula.position.set(Math.cos(ang) * 30, 33 + Math.sin(ang) * 30, 0);
+
+    // cápsula de vidro: ovoide achatado, pendurada no lado de fora do aro
+    const capsula = new Mesh(new SphereGeometry(1.15, 10, 7), matLuz);
+    capsula.scale.set(1, 0.78, 0.86);
+    capsula.position.set(Math.cos(ang) * 31.3, 33 + Math.sin(ang) * 31.3, 0);
     g.add(capsula);
   }
+
+  /* Plataforma na margem. A roda de verdade se apoia numa base de concreto na
+     beira d'água; sem ela as pernas ficavam plantadas dentro do lago. */
+  const plataforma = new Mesh(new BoxGeometry(30, 1.6, 20),
+    new MeshStandardMaterial({ color: new Color('#cbc0a8'), roughness: 0.85 }));
+  plataforma.position.set(0, 0.4, 5);
+  plataforma.receiveShadow = true;
+  g.add(plataforma);
+
   for (const x of [-9, 9]) {
     const perna = new Mesh(new CylinderGeometry(0.8, 1.2, 34, 8), matAco);
     perna.position.set(x, 17, 6);

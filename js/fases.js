@@ -119,12 +119,16 @@ export const FASES = [
 
     paleta: {
       ceuAlto: '#8ec2e8', ceuHorizonte: '#ffe7bb', ceuBaixo: '#f7d9a8',
-      corSol: '#fff0cc', dirSol: [-0.62, 0.22, 0.75], tamanhoSol: 200,
+      corSol: '#fff0cc', dirSol: [0.62, 0.22, 0.75], tamanhoSol: 200,
       forcaSol: 2.4, neblinaCeu: 0.34,
     },
     neblina: 0.0038,
     forcaHalo: 0,
-    dirLuz: [-0.58, 0.44, 0.68],
+    /* Sol do lado das árvores, não do lado do lago. Estava bem atrás da roda:
+       o aço claro contra o clarão do sol não tinha silhueta nenhuma. Agora as
+       folhas de outono ficam em contraluz (que é o que elas pedem) e a roda
+       recebe o dourado de frente, com o céu limpo atrás. */
+    dirLuz: [0.58, 0.44, 0.68],
     corSol: '#ffdfae', forcaLuzSol: 2.5,
     corCeuLuz: '#d2e6fa', corChaoLuz: '#b8a67c', forcaHemisferio: 1.25,
     corPoste: '#ffe2b4', forcaPoste: 4,
@@ -139,8 +143,21 @@ export const FASES = [
     janelasAcesas: 0, lojas: false,
 
     pontos: [
-      { tipo: 'roda', x: -40, z: 470, escala: 0.85,
-        legenda: 'A roda parada no alto, como quem também não quer que acabe.', aviso: 130 },
+      /* A London Eye em balanço sobre o lago, com o pé na margem de lá (a água
+         vai de x=-58 a x=-11). Antes ela era menor e ficava a x=-40: a menina
+         passava quase por baixo e a roda saía cortada pela quina de cima da
+         tela. O enquadramento vem da mesma conta do Big Ben — no auge da janela
+         (dist 418, a 76,6 m dela) o topo do aro fica 21° acima do eixo e a
+         menina 30° abaixo, os dois dentro dos 35° de meia-abertura, com a roda
+         ocupando dois terços da altura da tela.
+
+         O `recuo` de 18 é o que devolve folga para ela: afastando a câmera, o
+         ângulo dela abaixo do horizonte encolhe junto. */
+      { tipo: 'roda', x: -60, z: 470, escala: 1.2,
+        legenda: 'A roda parada no alto, como quem também não quer que acabe.',
+        aviso: 145,
+        olhada: { de: 330, ate: 440, fov: 70, recuo: 18, subida: 1.2,
+                  mira: [-60, 36, 470], dofPerto: 130, dofLonge: 520 } },
     ],
 
     padroes: PADROES_PARQUE,
