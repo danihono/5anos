@@ -562,8 +562,35 @@ export function iniciar() {
     Som.silenciarTudo();
     memoria.gravar('jogou', true);
     memoria.gravar('coletadas', [...estado.envelopes]);
+
+    /* Versão só-o-jogo (o build --demo, para mostrar por aí): as cartas e os
+       vídeos não estão do lado, então não há para onde navegar. Em vez de um
+       link morto, um cartão. O presente de verdade não passa por aqui — o
+       atributo só existe no index-demo.html. */
+    if (window.__soOJogo) { cartaoSoOJogo(); return; }
+
     const c = [...estado.envelopes].sort((a, b) => a - b).join(',');
     location.href = `${DESTINO_CARTAS}?from=jogo${c ? '&c=' + c : ''}`;
+  }
+
+  function cartaoSoOJogo() {
+    const n = estado.envelopes.size;
+    const chegou = estado.modo === 'final';
+    /* A cutscene termina fundindo para o preto (#fade está em z-index 70, o
+       recado em 18). Em vez de desfazer o fade, o cartão sobe por cima dele:
+       fica igual à entrega de verdade, em que o site das cartas nasce do preto. */
+    elRecado.style.zIndex = '71';
+    const recolhidos = n === CARTAS.length
+      ? ` E você recolheu os ${n} envelopes, todos eles.`
+      : n > 0
+        ? ` Você recolheu ${n} envelope${n === 1 ? '' : 's'} pelo caminho — mas nenhuma carta depende disso.`
+        : '';
+    mostrarRecado(
+      chegou ? 'Você chegou na porta.' : 'É aqui que as cartas abrem.',
+      `${chegou ? 'A porta abre' : 'No presente de verdade, a porta abre'} e as ${CARTAS.length} cartas estão esperando.${recolhidos}`
+        + ' Esta é só a versão de mostrar o jogo — as cartas, os vídeos e a encomenda assinada ficam no presente.',
+      [{ txt: chegou ? 'jogar de novo' : 'voltar para o jogo', forte: true, acao: () => location.reload() }]
+    );
   }
 
   /* ─────────── pausa e ajustes ─────────── */

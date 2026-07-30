@@ -193,6 +193,20 @@ def main():
     destino.write_text(saida, encoding="utf-8")
     print(f"[build] index.html gerado — {len(saida)/1024:.0f} KB (three r{versao} embutido)")
 
+    # Versão só-o-jogo, para mostrar por aí (Artifact, link solto) sem levar
+    # junto as cartas e os 91 MB de vídeo. Muda um atributo e nada mais: o
+    # `index.html` do presente sai daqui intocado.
+    # A marca vai num <script>, e não num atributo do <body>, de propósito:
+    # ao publicar como Artifact o arquivo pode ser embrulhado num esqueleto de
+    # HTML, e aí o <body> de dentro é descartado pelo interpretador junto com
+    # os atributos dele. Script inline sobrevive a isso.
+    if "--demo" in sys.argv:
+        demo = saida.replace("<body>", "<body>\n<script>window.__soOJogo=1;</script>", 1)
+        if demo == saida:
+            sys.exit("[build] não achei o <body> para marcar a versão de demonstração")
+        (RAIZ / "index-demo.html").write_text(demo, encoding="utf-8")
+        print(f"[build] index-demo.html gerado — o final mostra um cartão em vez de ir para as cartas")
+
 
 if __name__ == "__main__":
     main()
