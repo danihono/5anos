@@ -69,10 +69,15 @@ export function qualidadeAutomatica() {
   return 'alto';
 }
 
+/* O preset baixo é para o jogo ficar mais LEVE, não mais pobre. Ele tinha 45%
+   das árvores e 150 m de mundo desenhado, e como todo celular cai nele
+   (`ehTatil()` acima), o parque chegava vazio no aparelho do Daniel e cheio no
+   monitor. Árvore é barata — tronco e três esferas, com os materiais em cache —
+   então quem economiza aqui são os pixels, as sombras e a chuva, não o cenário. */
 export const PRESETS = {
   alto:  { pixelRatio: 2,   sombra: 2048, chuva: 9000, bloomNiveis: 3, distancia: 260, arvores: 1,   gotas: 1 },
-  medio: { pixelRatio: 1.5, sombra: 1024, chuva: 4500, bloomNiveis: 2, distancia: 200, arvores: .7,  gotas: 1 },
-  baixo: { pixelRatio: 1,   sombra: 512,  chuva: 1800, bloomNiveis: 0, distancia: 150, arvores: .45, gotas: 0 },
+  medio: { pixelRatio: 1.5, sombra: 1024, chuva: 4500, bloomNiveis: 2, distancia: 220, arvores: .9,  gotas: 1 },
+  baixo: { pixelRatio: 1,   sombra: 512,  chuva: 1800, bloomNiveis: 0, distancia: 200, arvores: .8,  gotas: 0 },
 };
 
 /** Guarda progresso sem explodir se o navegador bloquear o localStorage. */

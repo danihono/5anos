@@ -339,10 +339,15 @@ function qualidadeAutomatica() {
   return 'alto';
 }
 
+/* O preset baixo é para o jogo ficar mais LEVE, não mais pobre. Ele tinha 45%
+   das árvores e 150 m de mundo desenhado, e como todo celular cai nele
+   (`ehTatil()` acima), o parque chegava vazio no aparelho do Daniel e cheio no
+   monitor. Árvore é barata — tronco e três esferas, com os materiais em cache —
+   então quem economiza aqui são os pixels, as sombras e a chuva, não o cenário. */
 const PRESETS = {
   alto:  { pixelRatio: 2,   sombra: 2048, chuva: 9000, bloomNiveis: 3, distancia: 260, arvores: 1,   gotas: 1 },
-  medio: { pixelRatio: 1.5, sombra: 1024, chuva: 4500, bloomNiveis: 2, distancia: 200, arvores: .7,  gotas: 1 },
-  baixo: { pixelRatio: 1,   sombra: 512,  chuva: 1800, bloomNiveis: 0, distancia: 150, arvores: .45, gotas: 0 },
+  medio: { pixelRatio: 1.5, sombra: 1024, chuva: 4500, bloomNiveis: 2, distancia: 220, arvores: .9,  gotas: 1 },
+  baixo: { pixelRatio: 1,   sombra: 512,  chuva: 1800, bloomNiveis: 0, distancia: 200, arvores: .8,  gotas: 0 },
 };
 
 /** Guarda progresso sem explodir se o navegador bloquear o localStorage. */
@@ -4471,10 +4476,14 @@ function criarMundo(cena, renderer, fase, preset) {
          lago (que vai de x=-58 a x=-11), então ela emoldura a água em vez de
          tapar a vista, que era o motivo de não haver nada daquele lado. */
       const cores = fase.coresFolhagem;
+      /* A primeira faixa começa em 4.5 e não em 7. Num celular em pé a abertura
+         horizontal é estreita, e árvore encostada no caminho é a única que
+         entra no quadro perto — as de x=7 só apareciam quando já estavam longe
+         demais, comidas pela neblina. */
       const faixas = [
-        { de: 7, ate: 25, quantas: [4, 6], escala: [0.85, 1.25] },
-        { de: 26, ate: 58, quantas: [5, 8], escala: [1.0, 1.55] },
-        { de: -96, ate: -62, quantas: [3, 5], escala: [0.95, 1.4] },
+        { de: 4.5, ate: 24, quantas: [6, 9], escala: [0.8, 1.25] },
+        { de: 24, ate: 60, quantas: [7, 11], escala: [1.0, 1.6] },
+        { de: -96, ate: -62, quantas: [4, 7], escala: [0.95, 1.4] },
       ];
       for (const f of faixas) {
         const quantas = Math.round(r.inteiro(f.quantas[0], f.quantas[1]) * preset.arvores);
@@ -5205,7 +5214,29 @@ const MEIA_PROFUNDIDADE = 0.3;
 const CORACOES_CHEIOS = 3;
 const INVULNERAVEL = 1.25;
 const DESTINO_CARTAS = 'correio-dos-apaixonados-v2.html';
+/* O `fov` do three é VERTICAL, então a abertura horizontal muda com o formato
+   da tela. Num 16:9 deitado dá ±42°; num celular em pé dá ±13° — e todo o
+   cenário dos lados (o bosque do parque, os prédios da rua) sai do quadro. Era
+   por isso que o parque parecia vazio no celular do Daniel e cheio no meu
+   monitor.
+
+   Aqui a conta é invertida: escolhe-se a abertura HORIZONTAL e deriva-se a
+   vertical dela. Assim as duas visões mostram a mesma largura de mundo, e o
+   retrato ganha altura em vez de perder os lados. Todos os `fov` do jogo estão
+   escritos como "o que eu quero numa tela deitada" e passam por aqui. */
 const FOV_BASE = 54;
+const PROPORCAO_REF = 16 / 9;
+
+function fovVertical(fovDeitado, aspecto) {
+  const meiaH = Math.atan(Math.tan((fovDeitado * Math.PI / 360)) * PROPORCAO_REF);
+  const v = 2 * Math.atan(Math.tan(meiaH) / Math.max(aspecto, 0.42)) * 180 / Math.PI;
+  /* Teto de 86°. Sem teto, um celular em pé pediria 126° para igualar a largura
+     do monitor — vira olho de peixe, e o excesso de altura vira chão vazio com
+     a menina minúscula no meio. A 86° a abertura horizontal ainda quase dobra
+     em relação ao que era, e o resto se resolve subindo a mira (ver
+     `atualizarCamera`), que empurra o chão para fora do quadro. */
+  return limita(v, fovDeitado, 86);
+}
 
 const SVG_CORACAO = `<svg class="cor" viewBox="0 0 32 30" xmlns="http://www.w3.org/2000/svg">
 <path d="M16 29S2.2 20.3 2.2 11.2C2.2 6.3 6 2.6 10.6 2.6c3 0 5 1.7 5.4 2.6.4-.9 2.4-2.6 5.4-2.6
@@ -5256,7 +5287,8 @@ function iniciar() {
   renderer.shadowMap.type = PCFShadowMap;
 
   const cena = new Scene();
-  const camera = new PerspectiveCamera(FOV_BASE, innerWidth / innerHeight, 0.25, 600);
+  const camera = new PerspectiveCamera(
+    fovVertical(FOV_BASE, innerWidth / innerHeight), innerWidth / innerHeight, 0.25, 600);
   const pos = criarPos(renderer, cena, camera, { niveis: preset.bloomNiveis });
 
   function semWebGL() {
@@ -5841,7 +5873,7 @@ function iniciar() {
    * trás dela: só abre o ângulo, sobe, recua e muda a mira. Assim ela continua
    * na tela e no controle o tempo inteiro.
    */
-  let fovAtual = FOV_BASE;
+  let fovAtual = camera.fov;
   let dofMisturado = 0;
   function olhadaAtiva() {
     if (!mundo || !mundo.pontos || estado.modo !== 'correndo') return null;
@@ -5886,10 +5918,19 @@ function iniciar() {
     let px = camX + camTremor.x;
     let py = camY + camTremor.y;
     let pz = estado.dist - 6.6;
-    alvoOlhar.set(estado.x * 0.35, 1.45 - (estado.agachado ? 0.2 : 0), estado.dist + 9);
+    /* Em retrato o fov vertical é maior, e a altura extra ia toda para o chão:
+       metade da tela virava calçada vazia com a menina pequena no meio. Subindo
+       a mira na mesma proporção, o quadro ganha cenário em cima em vez de piso
+       embaixo, e ela volta a ocupar o lugar certo. */
+    const subidaRetrato = (camera.fov - FOV_BASE) * 0.055;
+    alvoOlhar.set(estado.x * 0.35,
+      1.45 + subidaRetrato - (estado.agachado ? 0.2 : 0), estado.dist + 9);
 
     const olhada = olhadaAtiva();
-    const fovAlvo = olhada ? mistura(FOV_BASE, olhada.o.fov ?? 76, olhada.peso) : FOV_BASE;
+    // os `fov` das olhadas são escritos como tela deitada e convertidos aqui,
+    // igual ao FOV_BASE — senão o enquadramento dos marcos só valeria no monitor
+    const fovDeitado = olhada ? mistura(FOV_BASE, olhada.o.fov ?? 76, olhada.peso) : FOV_BASE;
+    const fovAlvo = fovVertical(fovDeitado, camera.aspect);
     if (olhada) {
       const { o, peso } = olhada;
       py += (o.subida ?? 2.4) * peso;
@@ -6065,6 +6106,10 @@ function iniciar() {
   function redimensionar() {
     const l = innerWidth, a = innerHeight;
     camera.aspect = l / a;
+    // girar o celular muda a proporção: o fov vertical tem que ser recalculado,
+    // senão a abertura horizontal deixa de ser a mesma nas duas visões
+    camera.fov = fovVertical(FOV_BASE, camera.aspect);
+    fovAtual = camera.fov;
     camera.updateProjectionMatrix();
     renderer.setSize(l, a, false);
     const pr = renderer.getPixelRatio();

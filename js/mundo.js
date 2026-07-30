@@ -1720,10 +1720,14 @@ export function criarMundo(cena, renderer, fase, preset) {
          lago (que vai de x=-58 a x=-11), então ela emoldura a água em vez de
          tapar a vista, que era o motivo de não haver nada daquele lado. */
       const cores = fase.coresFolhagem;
+      /* A primeira faixa começa em 4.5 e não em 7. Num celular em pé a abertura
+         horizontal é estreita, e árvore encostada no caminho é a única que
+         entra no quadro perto — as de x=7 só apareciam quando já estavam longe
+         demais, comidas pela neblina. */
       const faixas = [
-        { de: 7, ate: 25, quantas: [4, 6], escala: [0.85, 1.25] },
-        { de: 26, ate: 58, quantas: [5, 8], escala: [1.0, 1.55] },
-        { de: -96, ate: -62, quantas: [3, 5], escala: [0.95, 1.4] },
+        { de: 4.5, ate: 24, quantas: [6, 9], escala: [0.8, 1.25] },
+        { de: 24, ate: 60, quantas: [7, 11], escala: [1.0, 1.6] },
+        { de: -96, ate: -62, quantas: [4, 7], escala: [0.95, 1.4] },
       ];
       for (const f of faixas) {
         const quantas = Math.round(r.inteiro(f.quantas[0], f.quantas[1]) * preset.arvores);
