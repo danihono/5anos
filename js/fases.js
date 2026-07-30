@@ -358,6 +358,13 @@ export function validarTrajeto(fase, itens) {
   return [];
 }
 
+/* Faixa 0 é a da ESQUERDA de quem joga, 2 é a da direita.
+   Repare no sinal invertido: a câmera olha ao longo de +z, e num sistema destro
+   isso põe o +x do mundo à ESQUERDA da tela. Enquanto isso aqui era
+   `(faixa - 1)`, apertar seta esquerda diminuía a faixa, diminuía o x e mandava
+   ela para a direita da tela — o contrário do que qualquer um espera. Corrigir
+   aqui conserta teclado e toque de uma vez só, porque os dois passam por
+   `trocarFaixa`. */
 export function posicaoDaFaixa(faixa) {
-  return (faixa - 1) * LARGURA_FAIXA;
+  return (1 - faixa) * LARGURA_FAIXA;
 }
