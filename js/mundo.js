@@ -17,7 +17,7 @@ import { Group, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, BoxGeometry, P
          BufferGeometry, Float32BufferAttribute, ShaderMaterial, LineSegments, AdditiveBlending,
          NormalBlending,
          Vector3 } from 'three';
-import { TAU, mistura, sorteio } from './util.js';
+import { TAU, mistura, limita, sorteio } from './util.js';
 import * as Mat from './materiais.js';
 // o ônibus vermelho de dois andares e o pedestre já existem como obstáculos;
 // aqui eles entram parados na calçada, só de enfeite, para a rua ter gente
@@ -102,6 +102,8 @@ function criarChao(fase, comprimento) {
     lago.rotation.x = -Math.PI / 2;
     lago.position.set((LAGO_DE + LAGO_ATE) / 2, -0.12, 0);
     g.add(lago);
+    // o anoitecer escurece a água junto com o céu
+    g.userData.agua = lago.material;
 
     // mureta de pedra na margem
     const margem = new Mesh(
@@ -594,7 +596,7 @@ function fazPisoDaClareira(p, fase) {
   return g;
 }
 
-function criarPontos(fase, alvo, preset, telas = []) {
+function criarPontos(fase, alvo, preset, telas = [], acendiveis = []) {
   const lista = [];
   for (const p of (fase.pontos || [])) {
     let obj = null;
@@ -605,6 +607,7 @@ function criarPontos(fase, alvo, preset, telas = []) {
     else if (p.tipo === 'piccadilly') obj = fazPiccadilly(fase);
     if (!obj) continue;
     if (obj.userData.painel) telas.push(...obj.userData.painel);
+    if (obj.userData.acender) acendiveis.push(obj.userData.acender);
 
     obj.position.set(p.x || 0, p.y || 0, p.z);
     if (p.rot) obj.rotation.y = p.rot;
@@ -1062,13 +1065,23 @@ function fazBalaustrada(comprimento, lado) {
  */
 function fazRodaGigante() {
   const g = new Group();
-  const matAco = new MeshStandardMaterial({ color: new Color('#7d94a8'), roughness: 0.4, metalness: 0.45 });
-  const matAcoClaro = new MeshStandardMaterial({ color: new Color('#93a9bb'), roughness: 0.42, metalness: 0.4 });
+  /* O aço ganha um emissivo azul que só acende à noite. A roda de verdade é
+     banhada por refletores azuis, e sem isso a estrutura virava um vulto preto
+     contra o céu escuro — as luzes das cápsulas flutuavam soltas, sem roda. */
+  const matAco = new MeshStandardMaterial({
+    color: new Color('#7d94a8'), roughness: 0.4, metalness: 0.45,
+    emissive: new Color('#2f6fa8'), emissiveIntensity: 0,
+  });
+  const matAcoClaro = new MeshStandardMaterial({
+    color: new Color('#93a9bb'), roughness: 0.42, metalness: 0.4,
+    emissive: new Color('#3d81bd'), emissiveIntensity: 0,
+  });
   const matLuz = new MeshStandardMaterial({
-    color: new Color('#d8f0ff'), emissive: new Color('#6ec6ff'),
-    emissiveIntensity: 2.8, roughness: 1,
+    color: new Color('#1b2d3a'), emissive: new Color('#6ec6ff'),
+    emissiveIntensity: 1.2, roughness: 1,
   });
   const CAPSULAS = 32;
+  const luzes = [];
 
   /* Bitolas grossas de propósito. A menina vê a roda de 60 a 140 m, e nessa
      faixa o tubo de 0,7 (0,84 depois da escala) dá 1,5 pixel: linha mais fina
@@ -1101,10 +1114,27 @@ function fazRodaGigante() {
     g.add(raio);
 
     // cápsula de vidro: ovoide achatado, pendurada no lado de fora do aro
-    const capsula = new Mesh(new SphereGeometry(1.15, 10, 7), matLuz);
+    /* Cada cápsula com material próprio: é o que permite a cor correr pela
+       roda à noite, como a de verdade faz. De dia elas ficam apagadas — uma
+       roda acesa às três da tarde parece brinquedo de parque. */
+    /* Base ESCURA e da própria cor, não o branco-azulado de antes. O material
+       soma difuso + emissivo, e depois vem exposição, bloom e ACES: uma cápsula
+       de albedo quase branco entrava no tonemap já perto do topo e saía branca,
+       por mais colorido que fosse o emissivo. Escurecendo a base, quem manda na
+       cor é só o emissivo — que é o que se quer numa lâmpada. */
+    const corCap = new Color().setHSL(i / CAPSULAS, 0.95, 0.5);
+    const matCap = new MeshStandardMaterial({
+      color: new Color().setHSL(i / CAPSULAS, 0.6, 0.12),
+      emissive: corCap, emissiveIntensity: 0, roughness: 1,
+    });
+    /* Raio 32.4, não 31.3: o aro tem tubo de 1.3, então sua borda externa está
+       justamente em 31.3 e as cápsulas ficavam meio enterradas nele — de um
+       lado da roda a perspectiva escondia metade de cada luz. */
+    const capsula = new Mesh(new SphereGeometry(1.15, 10, 7), matCap);
     capsula.scale.set(1, 0.78, 0.86);
-    capsula.position.set(Math.cos(ang) * 31.3, 33 + Math.sin(ang) * 31.3, 0);
+    capsula.position.set(Math.cos(ang) * 32.4, 33 + Math.sin(ang) * 32.4, 0);
     g.add(capsula);
+    luzes.push({ malha: capsula, matiz: i / CAPSULAS });
   }
 
   /* Plataforma na margem. A roda de verdade se apoia numa base de concreto na
@@ -1121,6 +1151,27 @@ function fazRodaGigante() {
     perna.rotation.x = -0.25;
     g.add(perna);
   }
+
+  /* Acender: `t` vai de 0 (dia) a 1 (noite) e `tempo` faz a cor correr pelo
+     aro. A London Eye de verdade muda de cor lentamente; aqui cada cápsula
+     ganha um matiz deslocado da vizinha e o conjunto gira devagar. */
+  /* Intensidade baixa de propósito. O limiar do bloom é 1.35 (`js/pos.js`) e
+     depois dele vem o ACES, que dessatura tudo o que passa de ~2: a 4.6 a
+     cápsula vermelha chegava no tonemap como (4.2, 1.1, 1.1) e saía rosa-claro,
+     e o halo do bloom terminava de lavar. A 2.0 o canal forte fica em 1.95 —
+     acima do limiar, então ainda sangra — e os fracos em 0.05. Aí é vermelho. */
+  const corViva = new Color();
+  g.userData.acender = (t, tempo) => {
+    corViva.setHSL((tempo * 0.03) % 1, 0.9, 0.5);
+    aro2.material.emissive.copy(corViva);
+    aro2.material.emissiveIntensity = t * 2.1;
+    matAco.emissiveIntensity = t * 0.55;
+    matAcoClaro.emissiveIntensity = t * 0.35;
+    for (const l of luzes) {
+      l.malha.material.emissive.setHSL((l.matiz + tempo * 0.045) % 1, 0.95, 0.5);
+      l.malha.material.emissiveIntensity = t * 2.0;
+    }
+  };
   return g;
 }
 
@@ -1878,7 +1929,8 @@ export function criarMundo(cena, renderer, fase, preset) {
   const pontosGrupo = new Group();
   grupo.add(pontosGrupo);
   const telas = [];
-  const pontos = criarPontos(fase, pontosGrupo, preset, telas);
+  const acendiveis = [];
+  const pontos = criarPontos(fase, pontosGrupo, preset, telas, acendiveis);
 
   /* marcos distantes, de pano de fundo */
   const marcos = new Group();
@@ -1910,8 +1962,82 @@ export function criarMundo(cena, renderer, fase, preset) {
 
   let tempo = 0;
 
+  /* ── o dia caindo ──────────────────────────────────────────────────────
+     Se a fase tem `paletaFim`, tudo o que define a hora do dia é interpolado
+     pela distância percorrida: os uniformes do céu, a cor da neblina, o sol, o
+     hemisférico e a força dos postes. É o que transforma a tarde do parque em
+     hora azul bem quando ela chega na roda-gigante.
+     ────────────────────────────────────────────────────────────────────── */
+  const A = fase.paletaFim ? new Color() : null;
+  const B = fase.paletaFim ? new Color() : null;
+  let anoitecer = 0;
+
+  function misturarCor(alvo, de, para, t) {
+    A.set(de); B.set(para);
+    alvo.copy(A).lerp(B, t);
+  }
+
+  function aplicarAnoitecer(zJogador) {
+    if (!fase.paletaFim) return;
+    const faixa = fase.anoitece || { de: 0.2, ate: 0.9 };
+    const bruto = limita(zJogador / fase.comprimento, 0, 1);
+    const t = limita((bruto - faixa.de) / (faixa.ate - faixa.de), 0, 1);
+    // suaviza as pontas, senão o céu "liga" de repente no começo e no fim
+    anoitecer = t * t * (3 - 2 * t);
+
+    /* As luzes correm a cada quadro, o céu só quando muda de verdade.
+       Estavam as duas coisas depois da mesma guarda, e aí bastava o anoitecer
+       terminar — que é exatamente quando a roda aparece — para as cores
+       congelarem no matiz em que estavam. */
+    for (const acender of acendiveis) acender(anoitecer, tempo);
+
+    if (Math.abs(anoitecer - aplicarAnoitecer.ultimo) < 0.002) return;
+    aplicarAnoitecer.ultimo = anoitecer;
+
+    const u = ceu.malha.material.uniforms;
+    const p0 = fase.paleta, p1 = fase.paletaFim;
+    misturarCor(u.corAlto.value, p0.ceuAlto, p1.ceuAlto, anoitecer);
+    misturarCor(u.corHorizonte.value, p0.ceuHorizonte, p1.ceuHorizonte, anoitecer);
+    misturarCor(u.corBaixo.value, p0.ceuBaixo, p1.ceuBaixo, anoitecer);
+    misturarCor(u.corSol.value, p0.corSol, p1.corSol, anoitecer);
+    u.tamanhoSol.value = mistura(p0.tamanhoSol ?? 160, p1.tamanhoSol ?? 160, anoitecer);
+    u.forcaSol.value = mistura(p0.forcaSol ?? 1, p1.forcaSol ?? 1, anoitecer);
+    u.neblina.value = mistura(p0.neblinaCeu ?? 0.35, p1.neblinaCeu ?? 0.35, anoitecer);
+    u.dirSol.value.fromArray(p1.dirSol).normalize().lerp(
+      new Vector3().fromArray(p0.dirSol).normalize(), 1 - anoitecer).normalize();
+
+    misturarCor(cena.fog.color, p0.ceuHorizonte,
+      fase.corNeblinaFim ?? p1.ceuHorizonte, anoitecer);
+    cena.fog.density = mistura(fase.neblina, fase.neblinaFim ?? fase.neblina, anoitecer);
+
+    misturarCor(sol.color, fase.corSol, fase.corSolFim ?? fase.corSol, anoitecer);
+    sol.intensity = mistura(fase.forcaLuzSol, fase.forcaLuzSolFim ?? fase.forcaLuzSol, anoitecer);
+    misturarCor(ceuLuz.color, fase.corCeuLuz, fase.corCeuLuzFim ?? fase.corCeuLuz, anoitecer);
+    misturarCor(ceuLuz.groundColor, fase.corChaoLuz, fase.corChaoLuzFim ?? fase.corChaoLuz, anoitecer);
+    ceuLuz.intensity = mistura(fase.forcaHemisferio, fase.forcaHemisferioFim ?? fase.forcaHemisferio, anoitecer);
+
+    /* O env map é assado uma vez, do céu da tarde, e não reassa nunca — é caro
+       demais para refazer correndo. Sem baixar a intensidade dele, o mundo
+       inteiro continuava recebendo a luz da tarde depois de escurecer: o céu
+       virava noite e a grama seguia verde-claro, a água azul-piscina. */
+    cena.environmentIntensity = mistura(1, fase.ambienteFim ?? 0.22, anoitecer);
+
+    if (chao.userData.agua && fase.corAguaFim) {
+      misturarCor(chao.userData.agua.color, fase.corAgua, fase.corAguaFim, anoitecer);
+    }
+
+    // os postes do parque acendem junto
+    const forca = mistura(fase.forcaPoste, fase.forcaPosteFim ?? fase.forcaPoste, anoitecer);
+    for (const l of lanternas) l.userData.forca = forca;
+
+    // e a roda-gigante acende com o céu
+    for (const acender of acendiveis) acender(anoitecer, tempo);
+  }
+  aplicarAnoitecer.ultimo = -1;
+
   function atualizar(dt, zJogador, camPos) {
     tempo += dt;
+    aplicarAnoitecer(zJogador);
 
     /* Os telões do Piccadilly piscam devagar, cada faixa no seu ritmo. É só a
        intensidade que varia — trocar a cor a cada quadro dava um estrobo, e o
@@ -1955,6 +2081,8 @@ export function criarMundo(cena, renderer, fase, preset) {
       const p = candidatos[i];
       if (p) {
         l.visible = true;
+        // a força vem do anoitecer quando a fase tem pôr do sol
+        if (l.userData.forca !== undefined) l.intensity = l.userData.forca;
         l.position.set(p.x + (p.x > 0 ? -0.5 : 0.5), 5, p.z);
       } else {
         l.visible = false;

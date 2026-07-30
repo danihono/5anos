@@ -140,8 +140,8 @@ export const FASES = [
   {
     id: 'hyde',
     numero: 'segunda parte',
-    titulo: 'A tarde parou no parque',
-    legenda: 'A chuva passou. O sol resolveu ficar do nosso lado.',
+    titulo: 'A tarde caindo no parque',
+    legenda: 'A chuva passou, e o dia resolveu ir embora devagar.',
     tipo: 'parque',
     semente: 20230917,
     comprimento: 850,
@@ -166,7 +166,40 @@ export const FASES = [
     corPoste: '#ffe2b4', forcaPoste: 4,
     sombra: 0.62,
 
-    chuva: 0.12, corChuva: '#ffe4c0', vento: [-0.5, 0],
+    /* O dia cai enquanto ela corre. Começa nesta tarde dourada e termina na
+       hora azul, que é quando a London Eye acende — o Daniel pediu a roda à
+       noite, colorida, e o pôr do sol é o que dá isso sem perder as árvores de
+       outono, que ficam lindas em contraluz. Interpolado por distância no
+       `atualizar` de mundo.js. */
+    /* O dia cai na primeira metade: na janela da roda (dist ≈ 418 de 850, ou
+       seja 0.49) já é noite fechada, que é onde ela precisa estar acesa. A
+       segunda metade corre no escuro e entrega a cena 3, que também é noite. */
+    anoitece: { de: 0.03, ate: 0.5 },
+    /* Hora azul, não pôr do sol. A primeira versão terminava num laranja
+       enorme: `neblinaCeu` 0.5 remistura a cor do horizonte até 24° de
+       elevação, então o laranja subia por dois terços da tela e a roda acesa
+       competia com o fundo em vez de brilhar sobre ele. Aqui o alto do céu é
+       marinho fundo e o laranja fica numa faixa baixa, que é o resto do sol
+       indo embora. É contra esse azul que as cápsulas coloridas aparecem. */
+    paletaFim: {
+      ceuAlto: '#0a1236', ceuHorizonte: '#66352a', ceuBaixo: '#241a30',
+      corSol: '#ff7a3a', dirSol: [0.62, -0.015, 0.75], tamanhoSol: 420,
+      forcaSol: 0.7, neblinaCeu: 0.18,
+    },
+    neblinaFim: 0.0044,
+    /* A neblina do mundo tem cor própria no fim. Antes ela seguia
+       `ceuHorizonte`, e com o horizonte laranja tudo o que estava longe —
+       árvores, água, a roda inteira — recebia banho de laranja. */
+    corNeblinaFim: '#232a52',
+    corSolFim: '#ff8a55', forcaLuzSolFim: 0.3,
+    corCeuLuzFim: '#33477e', corChaoLuzFim: '#2b2734', forcaHemisferioFim: 0.46,
+    ambienteFim: 0.16,
+    corAguaFim: '#12283c',
+    forcaPosteFim: 26,
+
+    // "A chuva passou": só o resto dela, um fiapo. A 0.12 os riscos brancos
+    // atravessavam o céu do anoitecer inteiro e pareciam arranhão de lente.
+    chuva: 0.04, corChuva: '#ffe4c0', vento: [-0.5, 0],
     molhado: 0.8, pedra: false,
     coresFolhagem: ['#b4671f', '#c98a2a', '#8c4f1c', '#6f7a2a', '#a8551a', '#d19a34'],
     corAgua: '#2f89a3',
