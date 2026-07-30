@@ -227,7 +227,9 @@ export const FASES = [
     /* A luz que acompanha ela. Existe desde o começo em jogo.js e nunca tinha
        sido ligada em fase nenhuma. Agora que ela veste couro preto, é o que
        impede a protagonista de virar uma silhueta perdida na rua noturna. */
-    luzHeroi: 5,
+    // 5 era para ela de couro preto; com blusa e meias creme o trabalho pesado
+    // já está feito pela própria roupa, e 5 deixava o cabelo alaranjado demais
+    luzHeroi: 3,
 
     // garoa discreta: contra o céu agora fundo, a chuva clara virava risco
     chuva: 0.3, corChuva: '#8ea3c6', vento: [-0.9, 0],

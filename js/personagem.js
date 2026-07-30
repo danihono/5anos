@@ -1,42 +1,50 @@
 /* ═══════════════ a menina ═══════════════
    Sem modelo 3D pronto: o corpo é montado com primitivas em grupos aninhados
    e animado por senoides nas juntas. A câmera fica atrás do ombro, então o
-   que precisa ler bem é a silhueta — casaco vermelho, cachecol creme e o
-   rabo de cavalo balançando com atraso.
+   que precisa ler bem é a silhueta.
 
-   A proporção é de desenho animado de propósito: cabeça grande, membros
-   curtos e grossos, tudo arredondado. Fica muito mais simpática de olhar do
-   que uma tentativa de humano realista feita com primitivas.
+   Tudo em BLOCOS facetados, copiado da imagem que o Daniel desenhou. A versão
+   anterior era feita de cápsulas e esferas, e ao lado do resto do jogo ela era
+   a parte fraca — "olha tudo o que fez até agora, isso aí é mole", nas palavras
+   dele. Bloco com `flatShading` pega a luz em faces chapadas e fica nítido e
+   proposital, em vez de um boneco de massinha derretido.
+
+   O esqueleto de grupos (quadril → tronco → pescoço → cabeça, e os membros com
+   joelho e cotovelo) é o mesmo de antes de propósito: toda a animação depende
+   dele e o ciclo de corrida acabou de ser acertado.
    ═════════════════════════════════════════ */
 
-import { Group, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, CapsuleGeometry,
-         CylinderGeometry, SphereGeometry, BoxGeometry, Color } from 'three';
+import { Group, Mesh, MeshStandardMaterial, BoxGeometry, Color } from 'three';
 import { TAU, limita, mistura, amortece } from './util.js';
 
-/* Copiada da foto que o Daniel mandou: cabelo escuro comprido e solto, jaqueta
-   de couro preta aberta, camiseta com estampa rosa, shorts, bolsa de alça de
-   corrente. O vermelho do casaco antigo servia para ela se recortar contra a
-   névoa; agora quem faz esse trabalho é a estampa da camiseta, e na cena da
-   noite a luz de apoio que segue ela (`luzHeroi` em jogo.js). */
+/* Da imagem do Daniel: cabelo castanho comprido em mechas, blusa creme de manga
+   comprida, mochila escura com fivela clara, saia escura com pregas, meias creme
+   até a canela e sapato escuro. */
 export const APARENCIA = {
-  jaqueta: '#17151a',
-  jaquetaForro: '#3b3540',
-  camiseta: '#1d1b21',
-  estampa: '#e33a6b',
-  /* Castanho quente, não preto. Na foto o cabelo é escuríssimo, mas em 3D
-     cabelo preto sobre jaqueta preta vira um borrão só — vista de trás, que é
-     a vista do jogo, ela some inteira. O castanho separa por matiz do couro
-     frio e devolve a silhueta. */
-  cabelo: '#3d2618',
-  pele: '#f0c4a2',
-  shorts: '#191720',
-  bota: '#241f28',
-  bolsa: '#1a181e',
-  corrente: '#cfc7b2',
+  blusa: '#f2e8d5',
+  blusaSombra: '#ddd0b8',
+  saia: '#26242e',
+  saiaPrega: '#191821',
+  mochila: '#3c434e',
+  mochilaAlca: '#2b313a',
+  fivela: '#d9d5c8',
+  cabelo: '#6b4226',
+  cabeloClaro: '#8a5a33',
+  cabeloEscuro: '#4e2f1a',
+  pele: '#f2d3b3',
+  meia: '#f4ece0',
+  sapato: '#3d2b20',
 };
 
 function material(cor, opcoes = {}) {
-  return new MeshStandardMaterial({ color: new Color(cor), roughness: 0.52, metalness: 0.02, ...opcoes });
+  return new MeshStandardMaterial({
+    color: new Color(cor), roughness: 0.62, metalness: 0, flatShading: true, ...opcoes,
+  });
+}
+
+/** Caixa: é a única primitiva do corpo dela agora. */
+function bloco(l, a, p) {
+  return new BoxGeometry(l, a, p);
 }
 
 function malha(geo, mat, pai, x = 0, y = 0, z = 0) {
@@ -49,31 +57,21 @@ function malha(geo, mat, pai, x = 0, y = 0, z = 0) {
 }
 
 export function criarMenina(aparencia = APARENCIA) {
-  /* Couro: liso, com verniz e um brilho rasante frio. É esse realce na borda
-     que salva a silhueta preta — sem ele ela vira um recorte chapado. */
-  const matJaqueta = new MeshPhysicalMaterial({
-    color: new Color(aparencia.jaqueta),
-    roughness: 0.34,
-    metalness: 0,
-    clearcoat: 0.6,
-    clearcoatRoughness: 0.35,
-    sheen: 0.7,
-    sheenRoughness: 0.4,
-    sheenColor: new Color('#9fb6d8'),
-  });
-  const matForro = material(aparencia.jaquetaForro, { roughness: 0.8 });
-  const matCamiseta = material(aparencia.camiseta, { roughness: 0.9 });
-  const matEstampa = material(aparencia.estampa, { roughness: 0.85 });
-  // brilho quente no cabelo, contra o brilho frio do couro: é o que separa os dois
-  const matCabelo = new MeshPhysicalMaterial({
-    color: new Color(aparencia.cabelo), roughness: 0.36, metalness: 0,
-    sheen: 0.6, sheenRoughness: 0.4, sheenColor: new Color('#c88f5a'),
-  });
-  const matPele = material(aparencia.pele, { roughness: 0.6 });
-  const matShorts = material(aparencia.shorts, { roughness: 0.8 });
-  const matBota = material(aparencia.bota, { roughness: 0.45 });
-  const matBolsa = material(aparencia.bolsa, { roughness: 0.6 });
-  const matCorrente = material(aparencia.corrente, { roughness: 0.3, metalness: 0.8 });
+  const matBlusa = material(aparencia.blusa);
+  const matBlusaSombra = material(aparencia.blusaSombra);
+  const matSaia = material(aparencia.saia, { roughness: 0.75 });
+  const matPrega = material(aparencia.saiaPrega, { roughness: 0.75 });
+  // miolo cheio por dentro, para não se ver o vazio entre as pregas
+  const matSaiaFundo = material(aparencia.saiaPrega, { roughness: 0.8 });
+  const matMochila = material(aparencia.mochila, { roughness: 0.7 });
+  const matAlca = material(aparencia.mochilaAlca, { roughness: 0.7 });
+  const matFivela = material(aparencia.fivela, { roughness: 0.5, metalness: 0.3 });
+  const matCabelo = material(aparencia.cabelo, { roughness: 0.5 });
+  const matCabeloClaro = material(aparencia.cabeloClaro, { roughness: 0.5 });
+  const matCabeloEscuro = material(aparencia.cabeloEscuro, { roughness: 0.5 });
+  const matPele = material(aparencia.pele, { roughness: 0.66 });
+  const matMeia = material(aparencia.meia, { roughness: 0.8 });
+  const matSapato = material(aparencia.sapato, { roughness: 0.6 });
 
   const raiz = new Group();
   const balanco = new Group();
@@ -83,146 +81,143 @@ export function criarMenina(aparencia = APARENCIA) {
   quadril.position.y = 0.92;
   balanco.add(quadril);
 
-  /* ── pernas ── */
-  const geoCoxa = new CapsuleGeometry(0.115, 0.24, 4, 14);
-  const geoCanela = new CapsuleGeometry(0.098, 0.24, 4, 14);
-  const geoBota = new SphereGeometry(0.115, 12, 10);
-
+  /* ── pernas: coxa nua, meia da canela ao tornozelo, sapato ── */
   function fazPerna(lado) {
     const g = new Group();
-    g.position.set(0.105 * lado, -0.02, 0);
+    g.position.set(0.1 * lado, -0.02, 0);
     quadril.add(g);
-    // coxa de pele com a barra do short por cima: é o que lê como "shorts"
-    malha(geoCoxa, matPele, g, 0, -0.2, 0);
-    malha(new CapsuleGeometry(0.125, 0.1, 4, 14), matShorts, g, 0, -0.11, 0);
+    malha(bloco(0.17, 0.42, 0.17), matPele, g, 0, -0.21, 0);
+
     const joelho = new Group();
-    joelho.position.y = -0.4;
+    joelho.position.y = -0.42;
     g.add(joelho);
-    malha(geoCanela, matPele, joelho, 0, -0.19, 0);
+    malha(bloco(0.15, 0.16, 0.15), matPele, joelho, 0, -0.08, 0);
+    malha(bloco(0.155, 0.26, 0.155), matMeia, joelho, 0, -0.29, 0);
+
     const tornozelo = new Group();
-    tornozelo.position.y = -0.38;
+    tornozelo.position.y = -0.42;
     joelho.add(tornozelo);
-    const bota = malha(geoBota, matBota, tornozelo, 0, -0.05, 0.035);
-    bota.scale.set(1, 0.78, 1.5);
+    malha(bloco(0.17, 0.1, 0.28), matSapato, tornozelo, 0, -0.05, 0.04);
     return { g, joelho, tornozelo };
   }
   const pernaE = fazPerna(-1);
   const pernaD = fazPerna(1);
 
-  /* ── tronco e casaco ── */
+  /* ── tronco: saia de pregas e blusa creme ── */
   const tronco = new Group();
   quadril.add(tronco);
 
-  /* Camiseta primeiro, jaqueta por cima e aberta. A jaqueta de motoqueiro é
-     curta e reta — nada do evasê do casaco antigo, que descia até a coxa. */
-  malha(new CapsuleGeometry(0.185, 0.34, 5, 20), matCamiseta, tronco, 0, 0.2, 0);
-  // a estampa, no peito, virada para fora
-  const estampa = malha(new CylinderGeometry(0.187, 0.187, 0.2, 20, 1, true), matEstampa, tronco, 0, 0.3, 0);
-  estampa.material.side = 2;
-  estampa.scale.set(1, 1, 0.55);
-
-  // as duas frentes de couro, abertas, deixando a estampa aparecer no meio
-  const corpoCasaco = new Group();
-  tronco.add(corpoCasaco);
-  /* No CylinderGeometry do three, theta=0 é o +z — que é a frente dela. As duas
-     abas saem daí para trás, cada uma para um lado, deixando aberto um vão de
-     40° na frente por onde a estampa aparece. */
-  for (const lado of [-1, 1]) {
-    const frente = malha(
-      new CylinderGeometry(0.215, 0.235, 0.46, 20, 1, true, lado > 0 ? 0.35 : -3.05, 2.7),
-      matJaqueta, corpoCasaco, 0, 0.16, 0
-    );
-    frente.material.side = 2;
+  // a saia, em pregas alternadas — larguras diferentes é o que faz ler como prega
+  const saia = new Group();
+  saia.position.y = -0.02;
+  tronco.add(saia);
+  /* 16 pregas de 0,11 num círculo de 1,26 m de perímetro: somadas dão 1,76, ou
+     seja elas se sobrepõem e formam uma saia contínua. Com 10 de 0,1 sobravam
+     vãos e a saia virava um cinto de abas soltas. */
+  const PREGAS = 16;
+  malha(bloco(0.34, 0.28, 0.34), matSaiaFundo, saia, 0, -0.13, 0);
+  for (let i = 0; i < PREGAS; i++) {
+    const a = (i / PREGAS) * TAU;
+    const fundo = i % 2 === 0;
+    const pr = malha(bloco(fundo ? 0.115 : 0.1, 0.3, 0.05), fundo ? matSaia : matPrega, saia,
+      Math.sin(a) * 0.205, -0.13, Math.cos(a) * 0.205);
+    pr.rotation.y = a;
+    pr.rotation.x = -0.12;                 // a barra abre um pouco para fora
   }
-  // gola levantada e o zíper aberto na cintura
-  malha(new CylinderGeometry(0.2, 0.2, 0.06, 20), matForro, corpoCasaco, 0, -0.07, 0);
-  malha(new SphereGeometry(0.155, 16, 12), matJaqueta, tronco, 0, 0.47, -0.01).scale.set(1.06, 0.5, 1.06);
+  malha(bloco(0.34, 0.1, 0.24), matSaia, tronco, 0, 0.03, 0);
 
-  /* ── braços ── */
-  const geoBraco = new CapsuleGeometry(0.072, 0.15, 4, 12);
-  const geoAntebraco = new CapsuleGeometry(0.063, 0.14, 4, 12);
+  // blusa: torso e a gola
+  malha(bloco(0.36, 0.44, 0.25), matBlusa, tronco, 0, 0.3, 0);
+  malha(bloco(0.3, 0.06, 0.21), matBlusaSombra, tronco, 0, 0.53, 0);
+
+  /* ── braços: manga comprida creme, mão de pele ── */
   function fazBraco(lado) {
     const g = new Group();
-    // ombro para fora do volume do casaco, senão o braço fica escondido
-    // dentro do cilindro e ela vira um sino vermelho
-    g.position.set(0.245 * lado, 0.42, 0);
+    g.position.set(0.23 * lado, 0.45, 0);
     tronco.add(g);
-    malha(geoBraco, matJaqueta, g, 0, -0.14, 0);
+    malha(bloco(0.12, 0.28, 0.13), matBlusa, g, 0, -0.14, 0);
     const cotovelo = new Group();
     cotovelo.position.y = -0.28;
     g.add(cotovelo);
-    malha(geoAntebraco, matJaqueta, cotovelo, 0, -0.13, 0);
-    // punho da manga e a mão saindo dele
-    malha(new CylinderGeometry(0.068, 0.062, 0.05, 12), matForro, cotovelo, 0, -0.21, 0);
-    malha(new SphereGeometry(0.062, 12, 10), matPele, cotovelo, 0, -0.25, 0);
+    malha(bloco(0.11, 0.24, 0.12), matBlusa, cotovelo, 0, -0.12, 0);
+    malha(bloco(0.1, 0.11, 0.11), matPele, cotovelo, 0, -0.29, 0);
     return { g, cotovelo };
   }
   const bracoE = fazBraco(-1);
   const bracoD = fazBraco(1);
 
-  /* ── bolsa a tiracolo: é onde as cartas vão parar ──
-     Preta com alça de corrente, como a da foto. A corrente é o único metal
-     dela e dá um brilho que ajuda a achá-la contra fundo escuro. */
+  /* ── mochila: é onde as cartas vão parar ── */
   const bolsa = new Group();
-  bolsa.position.set(0.2, 0.02, -0.03);
+  // um pouco mais larga que a cortina de cabelo (0,31), senão ela some inteira
+  bolsa.position.set(0, 0.28, -0.2);
   tronco.add(bolsa);
-  malha(new BoxGeometry(0.2, 0.15, 0.07), matBolsa, bolsa).geometry.computeVertexNormals();
-  malha(new BoxGeometry(0.2, 0.045, 0.075), matForro, bolsa, 0, 0.07, 0);
-  // a alça cruzando o peito
-  const alca = malha(new CylinderGeometry(0.011, 0.011, 0.62, 6), matCorrente, tronco, 0.02, 0.28, -0.02);
-  alca.rotation.set(0.1, 0, 0.55);
+  malha(bloco(0.36, 0.38, 0.14), matMochila, bolsa);
+  malha(bloco(0.12, 0.1, 0.03), matFivela, bolsa, 0, 0, -0.08);
+  malha(bloco(0.26, 0.06, 0.12), matAlca, bolsa, 0, 0.19, 0.01);
+  for (const lado of [-1, 1]) {
+    const alca = malha(bloco(0.05, 0.36, 0.04), matAlca, tronco, lado * 0.13, 0.36, 0.13);
+    alca.rotation.x = -0.12;
+  }
 
-  /* ── cabeça e cabelo ── */
+  /* ── cabeça ── */
   const pescoco = new Group();
   pescoco.position.y = 0.56;
   tronco.add(pescoco);
-  malha(new CylinderGeometry(0.062, 0.07, 0.06, 12), matPele, pescoco, 0, 0.02, 0);
+  malha(bloco(0.1, 0.07, 0.1), matPele, pescoco, 0, 0.02, 0);
 
   const cabeca = new Group();
-  cabeca.position.y = 0.11;
+  cabeca.position.y = 0.12;
   pescoco.add(cabeca);
-  malha(new SphereGeometry(0.152, 22, 18), matPele, cabeca, 0, 0.06, 0).scale.set(1, 1.04, 0.96);
-  // franja/topo
-  const topo = malha(new SphereGeometry(0.163, 22, 18), matCabelo, cabeca, 0, 0.085, -0.012);
-  topo.scale.set(1.02, 0.94, 1.04);
-
-  /* Cabelo comprido e solto, no lugar do rabo de cavalo. É o mesmo rig de
-     antes — cada segmento pendurado no anterior, perseguindo com atraso —
-     só que com mais segmentos e uma massa larga e achatada, que cai pelas
-     costas até abaixo do ombro. Duas mechas mais curtas emolduram o rosto. */
-  const cabelo = [];
-  let paiCabelo = cabeca;
-  for (let i = 0; i < 5; i++) {
-    const seg = new Group();
-    // z = -0.19 no primeiro: a nuca fica atrás da casca da jaqueta (raio 0.22).
-    // Em -0.1 o cabelo inteiro caía DENTRO do casaco e não aparecia.
-    seg.position.set(0, i === 0 ? -0.02 : -0.175, i === 0 ? -0.19 : 0);
-    paiCabelo.add(seg);
-    const esc = 1 - i * 0.07;
-    /* Duas medidas que brigam entre si e levaram três tentativas:
-       - a cápsula precisa ser quase TÃO COMPRIDA quanto o vão (0.175), senão
-         aparecem as emendas e o cabelo vira uma corda de nós;
-       - e não pode passar muito disso, senão os segmentos se enfiam uns nos
-         outros e tudo colapsa num capacete redondo (foi o primeiro erro).
-       Achatada e bem larga é o que faz ler como massa de cabelo, não como rabo. */
-    const m = malha(new CapsuleGeometry(0.058 * esc, 0.2, 4, 12), matCabelo, seg, 0, -0.088, 0);
-    m.scale.set(3.1, 1, 0.8);
-    cabelo.push(seg);
-    paiCabelo = seg;
+  malha(bloco(0.26, 0.28, 0.25), matPele, cabeca, 0, 0.08, 0);
+  // touca de cabelo: topo, nuca e a risca no meio
+  malha(bloco(0.285, 0.12, 0.275), matCabelo, cabeca, 0, 0.19, 0);
+  malha(bloco(0.285, 0.2, 0.09), matCabelo, cabeca, 0, 0.07, -0.1);
+  malha(bloco(0.04, 0.06, 0.09), matCabeloEscuro, cabeca, 0, 0.245, 0.02);
+  for (const lado of [-1, 1]) {
+    malha(bloco(0.05, 0.22, 0.26), matCabelo, cabeca, lado * 0.135, 0.09, 0);
   }
+
+  /* ── cabelo comprido, em mechas ──
+     Cada mecha é uma coluna de blocos pendurados um no outro, perseguindo o de
+     cima com atraso. O vão entre blocos tem que ser quase igual à altura do
+     bloco: menos e eles se enfiam uns nos outros virando um capacete, mais e
+     aparecem as emendas como nós de corda. Isso já custou três tentativas. */
+  const cabelo = [];
+  /* O tom é por MECHA, constante de cima a baixo. Alternar bloco a bloco fazia
+     um xadrez que lia como pele de girafa, não como cabelo. */
+  const COSTAS = [
+    { x: -0.105, larg: 0.105, comp: 5, mat: matCabeloEscuro },
+    { x: -0.035, larg: 0.095, comp: 6, mat: matCabelo },
+    { x: 0.035, larg: 0.095, comp: 6, mat: matCabeloClaro },
+    { x: 0.105, larg: 0.105, comp: 5, mat: matCabelo },
+  ];
+  for (const mecha of COSTAS) {
+    let pai = cabeca;
+    for (let i = 0; i < mecha.comp; i++) {
+      const seg = new Group();
+      seg.position.set(i === 0 ? mecha.x : 0, i === 0 ? 0.1 : -0.15, i === 0 ? -0.16 : 0);
+      pai.add(seg);
+      malha(bloco(mecha.larg, 0.16, 0.075), mecha.mat, seg, 0, -0.08, 0);
+      cabelo.push(seg);
+      pai = seg;
+    }
+  }
+  // duas mechas caindo na frente do ombro
   const mechas = [];
   for (const lado of [-1, 1]) {
     let pai = cabeca;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const seg = new Group();
-      seg.position.set(i === 0 ? 0.12 * lado : 0, i === 0 ? 0.04 : -0.155, 0);
+      seg.position.set(i === 0 ? 0.14 * lado : 0, i === 0 ? 0.06 : -0.15, i === 0 ? 0.04 : 0);
       pai.add(seg);
-      const m = malha(new CapsuleGeometry(0.038 - i * 0.005, 0.13, 4, 10), matCabelo, seg, 0, -0.075, 0);
-      m.scale.set(0.9, 1, 0.85);
+      malha(bloco(0.07, 0.16, 0.075), lado > 0 ? matCabelo : matCabeloClaro, seg, 0, -0.08, 0);
       mechas.push(seg);
       pai = seg;
     }
   }
+
+  // sem esta variável a animação do casaco antigo quebraria; agora é a saia
+  const corpoCasaco = saia;
 
   raiz.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
@@ -367,6 +362,6 @@ export function criarMenina(aparencia = APARENCIA) {
     atualizar,
     bolsa,
     set aoPassar(fn) { estadoInterno.aoPassar = fn; },
-    materiais: { matJaqueta, matEstampa, matCabelo },
+    materiais: { matBlusa, matSaia, matCabelo },
   };
 }
