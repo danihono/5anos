@@ -695,12 +695,71 @@ function sinetaDaPorta() {
   });
 }
 
+/**
+ * Uma badalada de sino. Sino não é som harmônico: os parciais ficam em razões
+ * NÃO inteiras da fundamental, e cada um decai num tempo diferente — é daí que
+ * vem o timbre metálico e o "batimento" que faz um sino soar como sino em vez
+ * de flauta. As razões abaixo são as clássicas de sino de torre.
+ */
+function sino1(freq, quando, volume, duracao) {
+  const PARCIAIS = [
+    { r: 0.5,  g: 0.30, d: 1.00 },   // o hum, uma oitava abaixo
+    { r: 1.0,  g: 1.00, d: 0.90 },   // fundamental
+    { r: 1.19, g: 0.42, d: 0.55 },   // terça menor, a assinatura do sino
+    { r: 1.50, g: 0.32, d: 0.45 },
+    { r: 2.00, g: 0.38, d: 0.35 },
+    { r: 2.55, g: 0.22, d: 0.22 },
+    { r: 3.42, g: 0.14, d: 0.15 },
+  ];
+  const saida = ctx.createGain();
+  saida.gain.value = volume;
+  const filtro = ctx.createBiquadFilter();
+  filtro.type = 'lowpass';
+  filtro.frequency.value = 4200;
+  saida.connect(filtro).connect(mestre);
+
+  for (const p of PARCIAIS) {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = freq * p.r;
+    // desafinar de leve dá o batimento lento de um sino grande
+    o.detune.value = (Math.random() - 0.5) * 6;
+    const g = ctx.createGain();
+    const dur = duracao * p.d;
+    g.gain.setValueAtTime(0.0001, quando);
+    g.gain.exponentialRampToValueAtTime(p.g, quando + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, quando + dur);
+    o.connect(g).connect(saida);
+    o.start(quando);
+    o.stop(quando + dur + 0.05);
+  }
+}
+
+/**
+ * As badaladas de Westminster. A frase é a original de 1793 (domínio público):
+ * sol♯ fá♯ mi si — e por baixo entra o sino grave da hora, em mi.
+ */
+function badaladas() {
+  if (!ligado) return;
+  const t = ctx.currentTime + 0.2;
+
+  const SOL = 415.30, FA = 369.99, MI = 329.63, SI = 246.94;
+  const FRASE = [SOL, FA, MI, SI];
+  FRASE.forEach((f, i) => sino1(f, t + i * 1.15, 0.16, 4.2));
+
+  // o sino da hora, grave, entrando quando a frase termina
+  const MI_GRAVE = 164.81;
+  for (let i = 0; i < 3; i++) {
+    sino1(MI_GRAVE, t + 5.1 + i * 2.1, 0.2, 7);
+  }
+}
+
 function silenciarTudo() {
   if (!ligado) return;
   pararAmbiente();
 }
 
-return { iniciar, retomar, alternarMudo, estaMudo, ambiente, passo, respingo, pulo, pouso, baque, sino, tombo, marco, sinetaDaPorta, silenciarTudo };
+return { iniciar, retomar, alternarMudo, estaMudo, ambiente, passo, respingo, pulo, pouso, baque, sino, tombo, marco, sinetaDaPorta, badaladas, silenciarTudo };
 })();
 
 /* ── js/materiais.js ── */
@@ -2609,7 +2668,7 @@ return { liberarRecursos, CONSTRUTORES, COMO_PASSAR, criarObstaculo };
 
 /* ── js/mundo.js ── */
 __M['mundo'] = (function(){
-const { Group, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, BoxGeometry, PlaneGeometry, CylinderGeometry, SphereGeometry, ConeGeometry, TorusGeometry, CircleGeometry, DirectionalLight, HemisphereLight, PointLight, Color, DoubleSide, FogExp2, BufferGeometry, Float32BufferAttribute, ShaderMaterial, LineSegments, AdditiveBlending, NormalBlending, Vector3 } = THREE;
+const { Group, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, BoxGeometry, PlaneGeometry, CylinderGeometry, SphereGeometry, ConeGeometry, TorusGeometry, CircleGeometry, DirectionalLight, HemisphereLight, PointLight, SpotLight, Color, DoubleSide, FogExp2, BufferGeometry, Float32BufferAttribute, ShaderMaterial, LineSegments, AdditiveBlending, NormalBlending, Vector3 } = THREE;
 const { TAU, mistura, sorteio } = __M['util'];
 const Mat = __M['materiais'];
 /* ═══════════════ o mundo ═══════════════
@@ -3142,11 +3201,16 @@ function fazPisoDaClareira(p, fase) {
 
   if (p.piso !== 'praca') return g;
 
+  /* A praça não pode ir até o horizonte: 80 m de calçada lisa viravam um pátio
+     vazio enorme do lado do Big Ben. Ela tem uma largura, e depois dela vem o
+     Tâmisa — que é onde Westminster fica de verdade, e é o fundo escuro contra
+     o qual a torre acesa aparece. */
+  const larg = p.larguraPiso ?? 80;
   const tex = Mat.calcada(fase.molhado, fase.semente + 21);
   for (const lado of (p.lado ? [p.lado] : [-1, 1])) {
-    const m = new Mesh(new PlaneGeometry(80, comp), materialChao(tex, [20, comp / 4]));
+    const m = new Mesh(new PlaneGeometry(larg, comp), materialChao(tex, [larg / 4, comp / 4]));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(lado * (FRENTE_PREDIO + 40), 0.16, p.z);
+    m.position.set(lado * (FRENTE_PREDIO + larg / 2), 0.16, p.z);
     m.receiveShadow = true;
     g.add(m);
 
@@ -3154,16 +3218,36 @@ function fazPisoDaClareira(p, fase) {
     bal.position.y = 0.16;
     bal.position.z = p.z;
     g.add(bal);
+
+    if (!p.rio) continue;
+    // o rio começa na borda da praça e some na neblina
+    const agua = new Mesh(new PlaneGeometry(220, comp + 60), new MeshStandardMaterial({
+      color: new Color(fase.corRio || '#3f6f80'), roughness: 0.45, metalness: 0,
+    }));
+    agua.rotation.x = -Math.PI / 2;
+    agua.position.set(lado * (FRENTE_PREDIO + larg + 110), -1.4, p.z);
+    g.add(agua);
+
+    // parapeito na borda da praça, escondendo o degrau até a água
+    const cais = new Mesh(new BoxGeometry(1.2, 3.4, comp),
+      new MeshStandardMaterial({ color: new Color('#c9bfa8'), roughness: 0.88 }));
+    cais.position.set(lado * (FRENTE_PREDIO + larg), 0.3, p.z);
+    cais.receiveShadow = true;
+    g.add(cais);
+
+    const grade = fazBalaustrada(comp, lado);
+    grade.position.set(lado * (FRENTE_PREDIO + larg - 1), 0.16, p.z);
+    g.add(grade);
   }
   return g;
 }
 
-function criarPontos(fase, alvo) {
+function criarPontos(fase, alvo, preset) {
   const lista = [];
   for (const p of (fase.pontos || [])) {
     let obj = null;
-    if (p.tipo === 'bigben') obj = fazBigBen();
-    else if (p.tipo === 'parlamento') obj = fazParlamento();
+    if (p.tipo === 'bigben') obj = fazBigBen({ noturno: p.noturno, preset });
+    else if (p.tipo === 'parlamento') obj = fazParlamento({ noturno: p.noturno });
     else if (p.tipo === 'roda') obj = fazRodaGigante();
     else if (p.tipo === 'ponte') obj = fazTowerBridge();
     if (!obj) continue;
@@ -3174,7 +3258,17 @@ function criarPontos(fase, alvo) {
     alvo.add(obj);
     alvo.add(fazPisoDaClareira(p, fase));
 
-    if (p.legenda) lista.push({ z: p.z, legenda: p.legenda, aviso: p.aviso ?? 60, mostrada: false });
+    if (p.legenda || p.olhada) {
+      lista.push({
+        z: p.z,
+        legenda: p.legenda || null,
+        aviso: p.aviso ?? 60,
+        olhada: p.olhada || null,
+        badalada: !!p.badalada,
+        mostrada: false,
+        soou: false,
+      });
+    }
   }
   return lista;
 }
@@ -3189,7 +3283,7 @@ function criarPontos(fase, alvo) {
  * pilastras subindo de ponta a ponta, cordões horizontais marcando os
  * pavimentos e janelas estreitas e altas entre elas. Sem isso era um paredão.
  */
-function fazBigBen() {
+function fazBigBen({ noturno = false, preset = null } = {}) {
   const g = new Group();
   const matPedra = new MeshStandardMaterial({ color: new Color('#dcc9a2'), roughness: 0.88 });
   const matSombra = new MeshStandardMaterial({ color: new Color('#b9a37c'), roughness: 0.9 });
@@ -3256,21 +3350,52 @@ function fazBigBen() {
   anelOuro.position.y = 59.6;
   g.add(anelOuro);
 
-  // os quatro relógios acesos
+  /* Os quatro mostradores. De noite eles são o herói do quadro: vidro opala
+     iluminado por trás, como os de verdade, com intensidade alta o bastante
+     para o bloom abrir halo em volta. Mais o aro dourado, que é o detalhe que
+     faz o olho reconhecer o relógio mesmo de longe. */
+  const matMostrador = new MeshStandardMaterial({
+    color: new Color(noturno ? '#fff0cc' : '#f3e2b4'),
+    emissive: new Color(noturno ? '#ffcf7a' : '#ffd98a'),
+    // 9 estourava: a 135 m o mostrador tem 33 px e virava um farol branco sem
+    // aro nem ponteiro. 4.5 deixa o disco âmbar legível com halo em volta.
+    emissiveIntensity: noturno ? 4.5 : 2.6,
+    roughness: 1,
+  });
+  const matAro = new MeshStandardMaterial({
+    color: new Color('#e0b055'), roughness: 0.3, metalness: 0.8,
+    emissive: new Color('#8a6520'), emissiveIntensity: noturno ? 1.6 : 0.5,
+  });
   for (let i = 0; i < 4; i++) {
-    const face = new Mesh(
-      new CircleGeometry(4.4, 24),
-      new MeshStandardMaterial({
-        color: new Color('#f3e2b4'), emissive: new Color('#ffd98a'),
-        emissiveIntensity: 2.6, roughness: 1,
-      })
-    );
-    face.position.y = 66;
     const ang = (i / 4) * TAU;
-    face.position.x = Math.sin(ang) * 6.3;
-    face.position.z = Math.cos(ang) * 6.3;
+    const px = Math.sin(ang) * 6.3;
+    const pz = Math.cos(ang) * 6.3;
+
+    const face = new Mesh(new CircleGeometry(4.4, 28), matMostrador);
+    face.position.set(px, 66, pz);
     face.rotation.y = ang;
     g.add(face);
+
+    const aro = new Mesh(new TorusGeometry(4.6, 0.34, 8, 28), matAro);
+    aro.position.set(px * 1.01, 66, pz * 1.01);
+    aro.rotation.y = ang;
+    g.add(aro);
+
+    /* Ponteiros. O pivô tem que ficar no CENTRO do mostrador, então cada um
+       é um grupo girado em Z com a haste deslocada para fora — girar a malha
+       direto botaria o eixo no meio da haste. */
+    const eixo = new Group();
+    eixo.position.set(px * 1.02, 66, pz * 1.02);
+    eixo.rotation.y = ang;
+    g.add(eixo);
+    for (const [comp, larg, giro] of [[3.1, 0.26, -0.9], [2.2, 0.36, 2.1]]) {
+      const braco = new Group();
+      braco.rotation.z = giro;
+      eixo.add(braco);
+      const ponteiro = new Mesh(new BoxGeometry(larg, comp, 0.18), matAro);
+      ponteiro.position.y = comp / 2 - 0.35;
+      braco.add(ponteiro);
+    }
   }
 
   const belfry = new Mesh(new BoxGeometry(11.5, 9, 11.5), matPedra);
@@ -3292,6 +3417,43 @@ function fazBigBen() {
   const flecha = new Mesh(new ConeGeometry(1.4, 9, 8), matDourado);
   flecha.position.y = 101;
   g.add(flecha);
+
+  /* Holofotes lavando a pedra de baixo para cima — é assim que a torre de
+     verdade é iluminada, e é o que desenha as pilastras e as janelas em luz e
+     sombra em vez de deixar tudo chapado. Sem sombra (custo) e com penumbra
+     alta (maciez). O ângulo é estreito para o facho subir os 100 m. */
+  if (noturno) {
+    const quantos = preset && preset.sombra <= 512 ? 1 : 3;
+    const posicoes = [[0, 13], [-11, -7], [11, -7]].slice(0, quantos);
+    for (const [lx, lz] of posicoes) {
+      const refletor = new SpotLight(new Color('#ffd9a0'), 1500, 190, 0.34, 0.85, 1.4);
+      refletor.position.set(lx, 1.2, lz);
+      refletor.target.position.set(lx * 0.25, 74, lz * 0.25);
+      refletor.castShadow = false;
+      g.add(refletor, refletor.target);
+
+      // a luminária no chão, visível e brilhando
+      const caixa = new Mesh(new CylinderGeometry(0.7, 0.85, 0.7, 12),
+        new MeshStandardMaterial({ color: new Color('#2b2f34'), roughness: 0.5, metalness: 0.6 }));
+      caixa.position.set(lx, 0.35, lz);
+      g.add(caixa);
+      const lente = new Mesh(new CircleGeometry(0.62, 16), new MeshStandardMaterial({
+        color: new Color('#fff2d6'), emissive: new Color('#ffd9a0'),
+        emissiveIntensity: 6, roughness: 1,
+      }));
+      lente.position.set(lx, 0.71, lz);
+      lente.rotation.x = -Math.PI / 2;
+      g.add(lente);
+    }
+
+    /* Uma luz solta no estágio do relógio, para o dourado dos mostradores
+       escorrer na pedra em volta em vez de ficar preso na face. É o detalhe
+       que faz o relógio parecer aceso, e não colado. */
+    const brilhoRelogio = new PointLight(new Color('#ffcf82'), 240, 46, 1.8);
+    brilhoRelogio.position.set(0, 66, 0);
+    g.add(brilhoRelogio);
+  }
+
   return g;
 }
 
@@ -3301,14 +3463,28 @@ function fazBigBen() {
  * dizer "gótico vitoriano" é o ritmo vertical: contraforte, janela ogival,
  * contraforte. É isso que está aqui agora.
  */
-function fazParlamento() {
+function fazParlamento({ noturno = false } = {}) {
   const g = new Group();
   const PEDRA = '#d9c9a3';
-  const matPedra = new MeshStandardMaterial({ color: new Color(PEDRA), roughness: 0.9 });
-  const matSombra = new MeshStandardMaterial({ color: new Color('#b8a480'), roughness: 0.92 });
+  /* De noite o Palácio é banhado por holofotes de ponta a ponta. Em vez de
+     enfileirar refletores — caros e desnecessários numa fachada plana —
+     a própria pedra emite de leve: dá o mesmo mel uniforme por nada. */
+  const matPedra = new MeshStandardMaterial({
+    color: new Color(PEDRA), roughness: 0.9,
+    emissive: new Color(noturno ? '#b98a46' : '#000000'), emissiveIntensity: noturno ? 1.15 : 0,
+  });
+  const matSombra = new MeshStandardMaterial({
+    color: new Color('#b8a480'), roughness: 0.92,
+    emissive: new Color(noturno ? '#7d5c2e' : '#000000'), emissiveIntensity: noturno ? 1.15 : 0,
+  });
+  /* De noite, as ogivas acesas por dentro. Sem isso o Palácio ficava um bloco
+     cinza morto ao lado da torre iluminada — e chamava mais atenção pelo que
+     tinha de errado do que pelo que tinha de certo. */
   const matVitral = new MeshStandardMaterial({
-    color: new Color('#8ea6bd'), roughness: 0.25, metalness: 0.1,
-    emissive: new Color('#3d4f66'), emissiveIntensity: 0.5,
+    color: new Color(noturno ? '#ffe3b0' : '#8ea6bd'), roughness: noturno ? 1 : 0.25,
+    metalness: noturno ? 0 : 0.1,
+    emissive: new Color(noturno ? '#ffbc63' : '#3d4f66'),
+    emissiveIntensity: noturno ? 2.4 : 0.5,
   });
 
   const COMP = 150;
@@ -3414,7 +3590,11 @@ function fazBalaustrada(comprimento, lado) {
     g.add(luminaria);
   }
   g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
-  g.position.x = lado * (FRENTE_PREDIO + 26);
+  /* Rente à calçada, na linha onde a fileira de casas abriu. Lá fora, a 26 m,
+     ela cortava a base do Big Ben ao meio; aqui vira a mureta do aterro, com
+     as luminárias passando perto da câmera — que é o que dá profundidade ao
+     enquadramento da torre. */
+  g.position.x = lado * (FRENTE_PREDIO + 1.4);
   return g;
 }
 
@@ -4005,7 +4185,7 @@ function criarMundo(cena, renderer, fase, preset) {
   /* marcos parados no trajeto, pelos quais ela realmente passa */
   const pontosGrupo = new Group();
   grupo.add(pontosGrupo);
-  const pontos = criarPontos(fase, pontosGrupo);
+  const pontos = criarPontos(fase, pontosGrupo, preset);
 
   /* marcos distantes, de pano de fundo */
   const marcos = new Group();
@@ -4231,15 +4411,9 @@ const FASES = [
     lojas: true, coresLoja: ['#c02a3e', '#2f7a68', '#3f5a9c', '#8a5aa8', '#d08a2a'],
     coresPorta: ['#2f5a8c', '#1f6b52', '#8e2436', '#3c3160', '#c07a1e', '#1d1b22'],
 
-    // Marcos por onde ela PASSA: a fileira de casas abre uma clareira do lado
-    // esquerdo e ali ficam o Parlamento, de fachada comprida rente à rua, e o
-    // Big Ben na ponta norte dele — como na cidade de verdade.
-    pontos: [
-      { tipo: 'parlamento', x: -64, z: 560, rot: Math.PI / 2, escala: 0.72,
-        claro: 420, lado: -1, piso: 'praca' },
-      { tipo: 'bigben', x: -34, z: 462, escala: 0.9,
-        legenda: 'Big Ben. Marcando o tempo que a gente já ganhou.', aviso: 190 },
-    ],
+    // Westminster mudou para a cena da noite, onde a torre pode ser iluminada
+    // de verdade. Aqui ficou só a fileira pastel contínua, que já é bonita.
+    pontos: [],
 
     padroes: PADROES_RUA,
     camera: { exposicao: 0.94, bloom: 0.5, vinheta: 0.3, grao: 0.004, gotas: 0.5, aberracao: 0,
@@ -4300,25 +4474,30 @@ const FASES = [
     legenda: 'É aqui. A luz acesa no fim da rua é para você.',
     tipo: 'rua',
     semente: 20260814,
-    comprimento: 800,
+    comprimento: 1000,
     velocidadeInicial: 13,
     velocidadeFinal: 16.5,
     cartas: [8, 9, 10],
 
+    /* Noite de verdade, não fim de tarde. O horizonte lavanda claro que estava
+       aqui antes era também a cor da neblina, e por isso a torre iluminada
+       aparecia como um fantasma pálido: claro sobre claro. Céu fundo + neblina
+       rala = o dourado do Big Ben tem contra o que brilhar. */
     paleta: {
-      ceuAlto: '#2b4a86', ceuHorizonte: '#a9a2c4', ceuBaixo: '#6d6690',
+      ceuAlto: '#0d1b3e', ceuHorizonte: '#3c3a63', ceuBaixo: '#211f40',
       corSol: '#ffd7a8', dirSol: [0.45, 0.3, -0.6], tamanhoSol: 220,
-      forcaSol: 1.2, neblinaCeu: 0.7,
+      forcaSol: 1.2, neblinaCeu: 0.55,
     },
-    neblina: 0.0072,
+    neblina: 0.004,
     forcaHalo: 0.03,
     dirLuz: [0.4, 0.66, -0.5],
     corSol: '#b9c3ea', forcaLuzSol: 0.95,
-    corCeuLuz: '#6b81be', corChaoLuz: '#3e3442', forcaHemisferio: 1.0,
+    corCeuLuz: '#4a5c96', corChaoLuz: '#3e3442', forcaHemisferio: 0.88,
     corPoste: '#ffc070', forcaPoste: 24,
     sombra: 0.5,
 
-    chuva: 0.3, corChuva: '#cbd8ea', vento: [-0.9, 0],
+    // garoa discreta: contra o céu agora fundo, a chuva clara virava risco
+    chuva: 0.3, corChuva: '#8ea3c6', vento: [-0.9, 0],
     molhado: 0.85, pedra: true,
 
     coresPredio: ['#e8c8cd', '#c3dcd6', '#eedcc0', '#cfd2ea', '#e6c4b4'],
@@ -4327,7 +4506,37 @@ const FASES = [
     coresPorta: ['#2f5a8c', '#1f6b52', '#8e2436', '#3c3160', '#1d1b22'],
 
     pontos: [
-      { tipo: 'ponte', x: 0, z: 396, escala: 1, claro: 176, lado: 0, piso: 'agua',
+      /* O CORAÇÃO DA CENA. É o lugar preferido dela, então o Big Ben não é
+         marco de passagem: a fileira de casas abre, os holofotes lavam a
+         pedra, os quatro relógios acendem e os sinos tocam. A janela de
+         `olhada` é calculada: a 76° de abertura uma torre de 100 m precisa de
+         ~123 m de distância para caber, e entre z=120 e z=205 ela está a
+         210–125 m. Cabe inteira o tempo todo. */
+      /* O Palácio corre para o sul a partir da torre, como o de verdade. Bem
+         afastado da rua: a 34 m ele entrava no quadro pelo canto direito como
+         um paredão preto de 19 m quando ela passava ao lado. */
+      { tipo: 'parlamento', x: -52, z: 450, rot: Math.PI / 2, escala: 0.72, noturno: true },
+
+      /* A clareira é do Big Ben, não do Parlamento: precisa começar ANTES da
+         janela da olhada, senão a última casa da fileira tapa a torre bem na
+         hora de olhar. De z=100 a z=560, com o Parlamento inteiro dentro. */
+      { tipo: 'bigben', x: -34, z: 330, escala: 0.92, noturno: true, badalada: true,
+        claro: 460, lado: -1, piso: 'praca', larguraPiso: 56, rio: true,
+        legenda: 'O Big Ben. O lugar preferido dela, aceso só para ela passar.',
+        aviso: 210,
+        /* Enquadramento medido, não chutado. A câmera fica a 4,05 m do chão e
+           20,6 m atrás dela, mirando a 38 m de altura na torre. No auge da
+           janela (dist ≈ 216) a torre ocupa 37° dos 70° de abertura — mais da
+           metade da tela — com o topo 21° acima do eixo e a menina 23° abaixo:
+           os dois dentro dos 35° de meia-abertura, do começo ao fim.
+           Mirar mais alto encheria mais o quadro, mas jogaria ela para fora —
+           e ela continua correndo, então continua na tela.
+           O desfoque de fundo também abre: com dofLonge de 120 m a torre
+           virava mancha justamente aqui. */
+        olhada: { de: 118, ate: 240, fov: 70, recuo: 14, subida: 1.2,
+                  mira: [-30, 38, 330], dofPerto: 170, dofLonge: 620 } },
+
+      { tipo: 'ponte', x: 0, z: 620, escala: 1, claro: 176, lado: 0, piso: 'agua',
         // a travessia é um momento, não um teste: nada de obstáculo em cima da ponte
         limpo: 62,
         legenda: 'Tower Bridge. Do outro lado do rio já dá para ver a agência.', aviso: 110 },
@@ -4380,9 +4589,13 @@ function gerarTrajeto(fase) {
   // Trechos que são momento, não desafio: a travessia da ponte fica sem
   // obstáculo. Filtrar aqui em vez de na hora de instanciar mantém o
   // validador vendo o trajeto de verdade.
-  const limpos = (fase.pontos || [])
-    .filter((p) => p.limpo)
-    .map((p) => ({ de: p.z - p.limpo / 2, ate: p.z + p.limpo / 2 }));
+  const limpos = [];
+  for (const p of (fase.pontos || [])) {
+    if (p.limpo) limpos.push({ de: p.z - p.limpo / 2, ate: p.z + p.limpo / 2 });
+    // se a câmera está virada para o marco, nada pode estar no caminho —
+    // isso é justiça com quem joga, não enfeite
+    if (p.olhada) limpos.push({ de: p.olhada.de - 12, ate: p.olhada.ate + 22 });
+  }
   const filtrado = itens.filter((it) => {
     if (COMO_PASSAR[it.tipo] === 'livre') return true;
     return !limpos.some((c) => it.z > c.de && it.z < c.ate);
@@ -4484,6 +4697,7 @@ const MEIA_PROFUNDIDADE = 0.3;
 const CORACOES_CHEIOS = 3;
 const INVULNERAVEL = 1.25;
 const DESTINO_CARTAS = 'correio-dos-apaixonados-v2.html';
+const FOV_BASE = 54;
 
 const SVG_CORACAO = `<svg class="cor" viewBox="0 0 32 30" xmlns="http://www.w3.org/2000/svg">
 <path d="M16 29S2.2 20.3 2.2 11.2C2.2 6.3 6 2.6 10.6 2.6c3 0 5 1.7 5.4 2.6.4-.9 2.4-2.6 5.4-2.6
@@ -4534,7 +4748,7 @@ function iniciar() {
   renderer.shadowMap.type = PCFShadowMap;
 
   const cena = new Scene();
-  const camera = new PerspectiveCamera(54, innerWidth / innerHeight, 0.25, 600);
+  const camera = new PerspectiveCamera(FOV_BASE, innerWidth / innerHeight, 0.25, 600);
   const pos = criarPos(renderer, cena, camera, { niveis: preset.bloomNiveis });
 
   function semWebGL() {
@@ -5086,6 +5300,28 @@ function iniciar() {
     camera.lookAt(alvoOlhar);
   }
 
+  /**
+   * Procura uma "olhada" ativa — o momento em que a câmera vira para um marco.
+   * Devolve o peso 0→1→0 (entra e sai suave) e o alvo. A câmera NUNCA sai de
+   * trás dela: só abre o ângulo, sobe, recua e muda a mira. Assim ela continua
+   * na tela e no controle o tempo inteiro.
+   */
+  let fovAtual = FOV_BASE;
+  let dofMisturado = 0;
+  function olhadaAtiva() {
+    if (!mundo || !mundo.pontos || estado.modo !== 'correndo') return null;
+    for (const p of mundo.pontos) {
+      const o = p.olhada;
+      if (!o) continue;
+      if (estado.dist < o.de || estado.dist > o.ate) continue;
+      const t = (estado.dist - o.de) / (o.ate - o.de);
+      // sobe no primeiro quinto, segura, desce no último quinto
+      const peso = Math.min(suaveEntre(0, 0.2, t), suaveEntre(1, 0.8, t));
+      return { o, peso };
+    }
+    return null;
+  }
+
   function atualizarCamera(dt) {
     if (estado.modo === 'final' && estado.tempoModo > 0.4) {
       // a câmera dá a volta e enquadra a fachada
@@ -5112,12 +5348,38 @@ function iniciar() {
       0
     );
 
-    camera.position.set(
-      camX + camTremor.x,
-      camY + camTremor.y,
-      estado.dist - 6.6
-    );
+    let px = camX + camTremor.x;
+    let py = camY + camTremor.y;
+    let pz = estado.dist - 6.6;
     alvoOlhar.set(estado.x * 0.35, 1.45 - (estado.agachado ? 0.2 : 0), estado.dist + 9);
+
+    const olhada = olhadaAtiva();
+    const fovAlvo = olhada ? mistura(FOV_BASE, olhada.o.fov ?? 76, olhada.peso) : FOV_BASE;
+    if (olhada) {
+      const { o, peso } = olhada;
+      py += (o.subida ?? 2.4) * peso;
+      pz -= (o.recuo ?? 5) * peso;
+      alvoOlhar.lerp(new Vector3(o.mira[0], o.mira[1], o.mira[2]), peso);
+    }
+    // o desfoque de fundo é feito para a rua; num marco distante ele apaga
+    // justamente o que se quer ver, então a olhada empurra o foco para longe
+    if (olhada || dofMisturado > 0.001) {
+      const c = fase.camera;
+      const o = olhada ? olhada.o : null;
+      dofMisturado = olhada ? olhada.peso : 0;
+      const u = pos.uniforms;
+      u.dofPerto.value = mistura(c.dofPerto ?? 14, (o && o.dofPerto) ?? 170, dofMisturado);
+      u.dofLonge.value = mistura(c.dofLonge ?? 66, (o && o.dofLonge) ?? 620, dofMisturado);
+    }
+
+    // trocar o fov exige recalcular a projeção; só quando muda de verdade
+    if (Math.abs(fovAlvo - fovAtual) > 0.01) {
+      fovAtual = fovAlvo;
+      camera.fov = fovAtual;
+      camera.updateProjectionMatrix();
+    }
+
+    camera.position.set(px, py, pz);
     camera.lookAt(alvoOlhar);
   }
 
@@ -5232,9 +5494,15 @@ function iniciar() {
     // legenda ao se aproximar de um marco do trajeto
     if (mundo && mundo.pontos && estado.modo === 'correndo') {
       for (const p of mundo.pontos) {
-        if (!p.mostrada && estado.dist > p.z - p.aviso) {
+        if (p.legenda && !p.mostrada && estado.dist > p.z - p.aviso) {
           p.mostrada = true;
           dizerLegenda(p.legenda, 4400);
+        }
+        // os sinos tocam quando ela entra na janela da olhada, e só uma vez:
+        // se morrer e voltar ao checkpoint, não repetem
+        if (p.badalada && !p.soou && p.olhada && estado.dist > p.olhada.de - 6) {
+          p.soou = true;
+          Som.badaladas();
         }
       }
     }
@@ -5328,6 +5596,8 @@ function iniciar() {
         get estado() { return estado; },
         get mundo() { return mundo; },
         get fase() { return fase; },
+        get trajeto() { return trajeto; },
+        get pos() { return pos; },
       };
     }
 

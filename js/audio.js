@@ -323,6 +323,65 @@ export function sinetaDaPorta() {
   });
 }
 
+/**
+ * Uma badalada de sino. Sino não é som harmônico: os parciais ficam em razões
+ * NÃO inteiras da fundamental, e cada um decai num tempo diferente — é daí que
+ * vem o timbre metálico e o "batimento" que faz um sino soar como sino em vez
+ * de flauta. As razões abaixo são as clássicas de sino de torre.
+ */
+function sino1(freq, quando, volume, duracao) {
+  const PARCIAIS = [
+    { r: 0.5,  g: 0.30, d: 1.00 },   // o hum, uma oitava abaixo
+    { r: 1.0,  g: 1.00, d: 0.90 },   // fundamental
+    { r: 1.19, g: 0.42, d: 0.55 },   // terça menor, a assinatura do sino
+    { r: 1.50, g: 0.32, d: 0.45 },
+    { r: 2.00, g: 0.38, d: 0.35 },
+    { r: 2.55, g: 0.22, d: 0.22 },
+    { r: 3.42, g: 0.14, d: 0.15 },
+  ];
+  const saida = ctx.createGain();
+  saida.gain.value = volume;
+  const filtro = ctx.createBiquadFilter();
+  filtro.type = 'lowpass';
+  filtro.frequency.value = 4200;
+  saida.connect(filtro).connect(mestre);
+
+  for (const p of PARCIAIS) {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = freq * p.r;
+    // desafinar de leve dá o batimento lento de um sino grande
+    o.detune.value = (Math.random() - 0.5) * 6;
+    const g = ctx.createGain();
+    const dur = duracao * p.d;
+    g.gain.setValueAtTime(0.0001, quando);
+    g.gain.exponentialRampToValueAtTime(p.g, quando + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, quando + dur);
+    o.connect(g).connect(saida);
+    o.start(quando);
+    o.stop(quando + dur + 0.05);
+  }
+}
+
+/**
+ * As badaladas de Westminster. A frase é a original de 1793 (domínio público):
+ * sol♯ fá♯ mi si — e por baixo entra o sino grave da hora, em mi.
+ */
+export function badaladas() {
+  if (!ligado) return;
+  const t = ctx.currentTime + 0.2;
+
+  const SOL = 415.30, FA = 369.99, MI = 329.63, SI = 246.94;
+  const FRASE = [SOL, FA, MI, SI];
+  FRASE.forEach((f, i) => sino1(f, t + i * 1.15, 0.16, 4.2));
+
+  // o sino da hora, grave, entrando quando a frase termina
+  const MI_GRAVE = 164.81;
+  for (let i = 0; i < 3; i++) {
+    sino1(MI_GRAVE, t + 5.1 + i * 2.1, 0.2, 7);
+  }
+}
+
 export function silenciarTudo() {
   if (!ligado) return;
   pararAmbiente();

@@ -31,6 +31,7 @@ const MEIA_PROFUNDIDADE = 0.3;
 const CORACOES_CHEIOS = 3;
 const INVULNERAVEL = 1.25;
 const DESTINO_CARTAS = 'correio-dos-apaixonados-v2.html';
+const FOV_BASE = 54;
 
 const SVG_CORACAO = `<svg class="cor" viewBox="0 0 32 30" xmlns="http://www.w3.org/2000/svg">
 <path d="M16 29S2.2 20.3 2.2 11.2C2.2 6.3 6 2.6 10.6 2.6c3 0 5 1.7 5.4 2.6.4-.9 2.4-2.6 5.4-2.6
@@ -81,7 +82,7 @@ export function iniciar() {
   renderer.shadowMap.type = PCFShadowMap;
 
   const cena = new Scene();
-  const camera = new PerspectiveCamera(54, innerWidth / innerHeight, 0.25, 600);
+  const camera = new PerspectiveCamera(FOV_BASE, innerWidth / innerHeight, 0.25, 600);
   const pos = criarPos(renderer, cena, camera, { niveis: preset.bloomNiveis });
 
   function semWebGL() {
@@ -633,6 +634,28 @@ export function iniciar() {
     camera.lookAt(alvoOlhar);
   }
 
+  /**
+   * Procura uma "olhada" ativa — o momento em que a câmera vira para um marco.
+   * Devolve o peso 0→1→0 (entra e sai suave) e o alvo. A câmera NUNCA sai de
+   * trás dela: só abre o ângulo, sobe, recua e muda a mira. Assim ela continua
+   * na tela e no controle o tempo inteiro.
+   */
+  let fovAtual = FOV_BASE;
+  let dofMisturado = 0;
+  function olhadaAtiva() {
+    if (!mundo || !mundo.pontos || estado.modo !== 'correndo') return null;
+    for (const p of mundo.pontos) {
+      const o = p.olhada;
+      if (!o) continue;
+      if (estado.dist < o.de || estado.dist > o.ate) continue;
+      const t = (estado.dist - o.de) / (o.ate - o.de);
+      // sobe no primeiro quinto, segura, desce no último quinto
+      const peso = Math.min(suaveEntre(0, 0.2, t), suaveEntre(1, 0.8, t));
+      return { o, peso };
+    }
+    return null;
+  }
+
   function atualizarCamera(dt) {
     if (estado.modo === 'final' && estado.tempoModo > 0.4) {
       // a câmera dá a volta e enquadra a fachada
@@ -659,12 +682,38 @@ export function iniciar() {
       0
     );
 
-    camera.position.set(
-      camX + camTremor.x,
-      camY + camTremor.y,
-      estado.dist - 6.6
-    );
+    let px = camX + camTremor.x;
+    let py = camY + camTremor.y;
+    let pz = estado.dist - 6.6;
     alvoOlhar.set(estado.x * 0.35, 1.45 - (estado.agachado ? 0.2 : 0), estado.dist + 9);
+
+    const olhada = olhadaAtiva();
+    const fovAlvo = olhada ? mistura(FOV_BASE, olhada.o.fov ?? 76, olhada.peso) : FOV_BASE;
+    if (olhada) {
+      const { o, peso } = olhada;
+      py += (o.subida ?? 2.4) * peso;
+      pz -= (o.recuo ?? 5) * peso;
+      alvoOlhar.lerp(new Vector3(o.mira[0], o.mira[1], o.mira[2]), peso);
+    }
+    // o desfoque de fundo é feito para a rua; num marco distante ele apaga
+    // justamente o que se quer ver, então a olhada empurra o foco para longe
+    if (olhada || dofMisturado > 0.001) {
+      const c = fase.camera;
+      const o = olhada ? olhada.o : null;
+      dofMisturado = olhada ? olhada.peso : 0;
+      const u = pos.uniforms;
+      u.dofPerto.value = mistura(c.dofPerto ?? 14, (o && o.dofPerto) ?? 170, dofMisturado);
+      u.dofLonge.value = mistura(c.dofLonge ?? 66, (o && o.dofLonge) ?? 620, dofMisturado);
+    }
+
+    // trocar o fov exige recalcular a projeção; só quando muda de verdade
+    if (Math.abs(fovAlvo - fovAtual) > 0.01) {
+      fovAtual = fovAlvo;
+      camera.fov = fovAtual;
+      camera.updateProjectionMatrix();
+    }
+
+    camera.position.set(px, py, pz);
     camera.lookAt(alvoOlhar);
   }
 
@@ -779,9 +828,15 @@ export function iniciar() {
     // legenda ao se aproximar de um marco do trajeto
     if (mundo && mundo.pontos && estado.modo === 'correndo') {
       for (const p of mundo.pontos) {
-        if (!p.mostrada && estado.dist > p.z - p.aviso) {
+        if (p.legenda && !p.mostrada && estado.dist > p.z - p.aviso) {
           p.mostrada = true;
           dizerLegenda(p.legenda, 4400);
+        }
+        // os sinos tocam quando ela entra na janela da olhada, e só uma vez:
+        // se morrer e voltar ao checkpoint, não repetem
+        if (p.badalada && !p.soou && p.olhada && estado.dist > p.olhada.de - 6) {
+          p.soou = true;
+          Som.badaladas();
         }
       }
     }
@@ -875,6 +930,8 @@ export function iniciar() {
         get estado() { return estado; },
         get mundo() { return mundo; },
         get fase() { return fase; },
+        get trajeto() { return trajeto; },
+        get pos() { return pos; },
       };
     }
 

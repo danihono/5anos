@@ -12,7 +12,7 @@
 
 import { Group, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, BoxGeometry, PlaneGeometry,
          CylinderGeometry, SphereGeometry, ConeGeometry, TorusGeometry, CircleGeometry,
-         DirectionalLight, HemisphereLight, PointLight, Color, DoubleSide, FogExp2,
+         DirectionalLight, HemisphereLight, PointLight, SpotLight, Color, DoubleSide, FogExp2,
          BufferGeometry, Float32BufferAttribute, ShaderMaterial, LineSegments, AdditiveBlending,
          NormalBlending,
          Vector3 } from 'three';
@@ -537,11 +537,16 @@ function fazPisoDaClareira(p, fase) {
 
   if (p.piso !== 'praca') return g;
 
+  /* A praça não pode ir até o horizonte: 80 m de calçada lisa viravam um pátio
+     vazio enorme do lado do Big Ben. Ela tem uma largura, e depois dela vem o
+     Tâmisa — que é onde Westminster fica de verdade, e é o fundo escuro contra
+     o qual a torre acesa aparece. */
+  const larg = p.larguraPiso ?? 80;
   const tex = Mat.calcada(fase.molhado, fase.semente + 21);
   for (const lado of (p.lado ? [p.lado] : [-1, 1])) {
-    const m = new Mesh(new PlaneGeometry(80, comp), materialChao(tex, [20, comp / 4]));
+    const m = new Mesh(new PlaneGeometry(larg, comp), materialChao(tex, [larg / 4, comp / 4]));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(lado * (FRENTE_PREDIO + 40), 0.16, p.z);
+    m.position.set(lado * (FRENTE_PREDIO + larg / 2), 0.16, p.z);
     m.receiveShadow = true;
     g.add(m);
 
@@ -549,16 +554,36 @@ function fazPisoDaClareira(p, fase) {
     bal.position.y = 0.16;
     bal.position.z = p.z;
     g.add(bal);
+
+    if (!p.rio) continue;
+    // o rio começa na borda da praça e some na neblina
+    const agua = new Mesh(new PlaneGeometry(220, comp + 60), new MeshStandardMaterial({
+      color: new Color(fase.corRio || '#3f6f80'), roughness: 0.45, metalness: 0,
+    }));
+    agua.rotation.x = -Math.PI / 2;
+    agua.position.set(lado * (FRENTE_PREDIO + larg + 110), -1.4, p.z);
+    g.add(agua);
+
+    // parapeito na borda da praça, escondendo o degrau até a água
+    const cais = new Mesh(new BoxGeometry(1.2, 3.4, comp),
+      new MeshStandardMaterial({ color: new Color('#c9bfa8'), roughness: 0.88 }));
+    cais.position.set(lado * (FRENTE_PREDIO + larg), 0.3, p.z);
+    cais.receiveShadow = true;
+    g.add(cais);
+
+    const grade = fazBalaustrada(comp, lado);
+    grade.position.set(lado * (FRENTE_PREDIO + larg - 1), 0.16, p.z);
+    g.add(grade);
   }
   return g;
 }
 
-function criarPontos(fase, alvo) {
+function criarPontos(fase, alvo, preset) {
   const lista = [];
   for (const p of (fase.pontos || [])) {
     let obj = null;
-    if (p.tipo === 'bigben') obj = fazBigBen();
-    else if (p.tipo === 'parlamento') obj = fazParlamento();
+    if (p.tipo === 'bigben') obj = fazBigBen({ noturno: p.noturno, preset });
+    else if (p.tipo === 'parlamento') obj = fazParlamento({ noturno: p.noturno });
     else if (p.tipo === 'roda') obj = fazRodaGigante();
     else if (p.tipo === 'ponte') obj = fazTowerBridge();
     if (!obj) continue;
@@ -569,7 +594,17 @@ function criarPontos(fase, alvo) {
     alvo.add(obj);
     alvo.add(fazPisoDaClareira(p, fase));
 
-    if (p.legenda) lista.push({ z: p.z, legenda: p.legenda, aviso: p.aviso ?? 60, mostrada: false });
+    if (p.legenda || p.olhada) {
+      lista.push({
+        z: p.z,
+        legenda: p.legenda || null,
+        aviso: p.aviso ?? 60,
+        olhada: p.olhada || null,
+        badalada: !!p.badalada,
+        mostrada: false,
+        soou: false,
+      });
+    }
   }
   return lista;
 }
@@ -584,7 +619,7 @@ function criarPontos(fase, alvo) {
  * pilastras subindo de ponta a ponta, cordões horizontais marcando os
  * pavimentos e janelas estreitas e altas entre elas. Sem isso era um paredão.
  */
-function fazBigBen() {
+function fazBigBen({ noturno = false, preset = null } = {}) {
   const g = new Group();
   const matPedra = new MeshStandardMaterial({ color: new Color('#dcc9a2'), roughness: 0.88 });
   const matSombra = new MeshStandardMaterial({ color: new Color('#b9a37c'), roughness: 0.9 });
@@ -651,21 +686,52 @@ function fazBigBen() {
   anelOuro.position.y = 59.6;
   g.add(anelOuro);
 
-  // os quatro relógios acesos
+  /* Os quatro mostradores. De noite eles são o herói do quadro: vidro opala
+     iluminado por trás, como os de verdade, com intensidade alta o bastante
+     para o bloom abrir halo em volta. Mais o aro dourado, que é o detalhe que
+     faz o olho reconhecer o relógio mesmo de longe. */
+  const matMostrador = new MeshStandardMaterial({
+    color: new Color(noturno ? '#fff0cc' : '#f3e2b4'),
+    emissive: new Color(noturno ? '#ffcf7a' : '#ffd98a'),
+    // 9 estourava: a 135 m o mostrador tem 33 px e virava um farol branco sem
+    // aro nem ponteiro. 4.5 deixa o disco âmbar legível com halo em volta.
+    emissiveIntensity: noturno ? 4.5 : 2.6,
+    roughness: 1,
+  });
+  const matAro = new MeshStandardMaterial({
+    color: new Color('#e0b055'), roughness: 0.3, metalness: 0.8,
+    emissive: new Color('#8a6520'), emissiveIntensity: noturno ? 1.6 : 0.5,
+  });
   for (let i = 0; i < 4; i++) {
-    const face = new Mesh(
-      new CircleGeometry(4.4, 24),
-      new MeshStandardMaterial({
-        color: new Color('#f3e2b4'), emissive: new Color('#ffd98a'),
-        emissiveIntensity: 2.6, roughness: 1,
-      })
-    );
-    face.position.y = 66;
     const ang = (i / 4) * TAU;
-    face.position.x = Math.sin(ang) * 6.3;
-    face.position.z = Math.cos(ang) * 6.3;
+    const px = Math.sin(ang) * 6.3;
+    const pz = Math.cos(ang) * 6.3;
+
+    const face = new Mesh(new CircleGeometry(4.4, 28), matMostrador);
+    face.position.set(px, 66, pz);
     face.rotation.y = ang;
     g.add(face);
+
+    const aro = new Mesh(new TorusGeometry(4.6, 0.34, 8, 28), matAro);
+    aro.position.set(px * 1.01, 66, pz * 1.01);
+    aro.rotation.y = ang;
+    g.add(aro);
+
+    /* Ponteiros. O pivô tem que ficar no CENTRO do mostrador, então cada um
+       é um grupo girado em Z com a haste deslocada para fora — girar a malha
+       direto botaria o eixo no meio da haste. */
+    const eixo = new Group();
+    eixo.position.set(px * 1.02, 66, pz * 1.02);
+    eixo.rotation.y = ang;
+    g.add(eixo);
+    for (const [comp, larg, giro] of [[3.1, 0.26, -0.9], [2.2, 0.36, 2.1]]) {
+      const braco = new Group();
+      braco.rotation.z = giro;
+      eixo.add(braco);
+      const ponteiro = new Mesh(new BoxGeometry(larg, comp, 0.18), matAro);
+      ponteiro.position.y = comp / 2 - 0.35;
+      braco.add(ponteiro);
+    }
   }
 
   const belfry = new Mesh(new BoxGeometry(11.5, 9, 11.5), matPedra);
@@ -687,6 +753,43 @@ function fazBigBen() {
   const flecha = new Mesh(new ConeGeometry(1.4, 9, 8), matDourado);
   flecha.position.y = 101;
   g.add(flecha);
+
+  /* Holofotes lavando a pedra de baixo para cima — é assim que a torre de
+     verdade é iluminada, e é o que desenha as pilastras e as janelas em luz e
+     sombra em vez de deixar tudo chapado. Sem sombra (custo) e com penumbra
+     alta (maciez). O ângulo é estreito para o facho subir os 100 m. */
+  if (noturno) {
+    const quantos = preset && preset.sombra <= 512 ? 1 : 3;
+    const posicoes = [[0, 13], [-11, -7], [11, -7]].slice(0, quantos);
+    for (const [lx, lz] of posicoes) {
+      const refletor = new SpotLight(new Color('#ffd9a0'), 1500, 190, 0.34, 0.85, 1.4);
+      refletor.position.set(lx, 1.2, lz);
+      refletor.target.position.set(lx * 0.25, 74, lz * 0.25);
+      refletor.castShadow = false;
+      g.add(refletor, refletor.target);
+
+      // a luminária no chão, visível e brilhando
+      const caixa = new Mesh(new CylinderGeometry(0.7, 0.85, 0.7, 12),
+        new MeshStandardMaterial({ color: new Color('#2b2f34'), roughness: 0.5, metalness: 0.6 }));
+      caixa.position.set(lx, 0.35, lz);
+      g.add(caixa);
+      const lente = new Mesh(new CircleGeometry(0.62, 16), new MeshStandardMaterial({
+        color: new Color('#fff2d6'), emissive: new Color('#ffd9a0'),
+        emissiveIntensity: 6, roughness: 1,
+      }));
+      lente.position.set(lx, 0.71, lz);
+      lente.rotation.x = -Math.PI / 2;
+      g.add(lente);
+    }
+
+    /* Uma luz solta no estágio do relógio, para o dourado dos mostradores
+       escorrer na pedra em volta em vez de ficar preso na face. É o detalhe
+       que faz o relógio parecer aceso, e não colado. */
+    const brilhoRelogio = new PointLight(new Color('#ffcf82'), 240, 46, 1.8);
+    brilhoRelogio.position.set(0, 66, 0);
+    g.add(brilhoRelogio);
+  }
+
   return g;
 }
 
@@ -696,14 +799,28 @@ function fazBigBen() {
  * dizer "gótico vitoriano" é o ritmo vertical: contraforte, janela ogival,
  * contraforte. É isso que está aqui agora.
  */
-function fazParlamento() {
+function fazParlamento({ noturno = false } = {}) {
   const g = new Group();
   const PEDRA = '#d9c9a3';
-  const matPedra = new MeshStandardMaterial({ color: new Color(PEDRA), roughness: 0.9 });
-  const matSombra = new MeshStandardMaterial({ color: new Color('#b8a480'), roughness: 0.92 });
+  /* De noite o Palácio é banhado por holofotes de ponta a ponta. Em vez de
+     enfileirar refletores — caros e desnecessários numa fachada plana —
+     a própria pedra emite de leve: dá o mesmo mel uniforme por nada. */
+  const matPedra = new MeshStandardMaterial({
+    color: new Color(PEDRA), roughness: 0.9,
+    emissive: new Color(noturno ? '#b98a46' : '#000000'), emissiveIntensity: noturno ? 1.15 : 0,
+  });
+  const matSombra = new MeshStandardMaterial({
+    color: new Color('#b8a480'), roughness: 0.92,
+    emissive: new Color(noturno ? '#7d5c2e' : '#000000'), emissiveIntensity: noturno ? 1.15 : 0,
+  });
+  /* De noite, as ogivas acesas por dentro. Sem isso o Palácio ficava um bloco
+     cinza morto ao lado da torre iluminada — e chamava mais atenção pelo que
+     tinha de errado do que pelo que tinha de certo. */
   const matVitral = new MeshStandardMaterial({
-    color: new Color('#8ea6bd'), roughness: 0.25, metalness: 0.1,
-    emissive: new Color('#3d4f66'), emissiveIntensity: 0.5,
+    color: new Color(noturno ? '#ffe3b0' : '#8ea6bd'), roughness: noturno ? 1 : 0.25,
+    metalness: noturno ? 0 : 0.1,
+    emissive: new Color(noturno ? '#ffbc63' : '#3d4f66'),
+    emissiveIntensity: noturno ? 2.4 : 0.5,
   });
 
   const COMP = 150;
@@ -809,7 +926,11 @@ function fazBalaustrada(comprimento, lado) {
     g.add(luminaria);
   }
   g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
-  g.position.x = lado * (FRENTE_PREDIO + 26);
+  /* Rente à calçada, na linha onde a fileira de casas abriu. Lá fora, a 26 m,
+     ela cortava a base do Big Ben ao meio; aqui vira a mureta do aterro, com
+     as luminárias passando perto da câmera — que é o que dá profundidade ao
+     enquadramento da torre. */
+  g.position.x = lado * (FRENTE_PREDIO + 1.4);
   return g;
 }
 
@@ -1400,7 +1521,7 @@ export function criarMundo(cena, renderer, fase, preset) {
   /* marcos parados no trajeto, pelos quais ela realmente passa */
   const pontosGrupo = new Group();
   grupo.add(pontosGrupo);
-  const pontos = criarPontos(fase, pontosGrupo);
+  const pontos = criarPontos(fase, pontosGrupo, preset);
 
   /* marcos distantes, de pano de fundo */
   const marcos = new Group();

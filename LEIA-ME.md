@@ -46,9 +46,15 @@ O `build.py` concatena o `vendor/three/*.min.js` e os módulos de `js/` dentro d
 
 - `index.html?fase=1` — abre direto a segunda cena (0, 1 ou 2).
 - `index.html?dist=700` — começa já adiantada na cena.
-- `index.html#debug` — mostra o contador de quadros por segundo.
+- `index.html#debug` — mostra o contador de quadros por segundo e publica `window.__jogo` (cena, câmera, estado, mundo, fase, trajeto, pós).
 
 Sem esses parâmetros o jogo começa do início, como deve.
+
+> **Cuidado ao tirar print com `?dist=`.** Os quarteirões nascem em z≈0 e vão sendo
+> reciclados para a frente conforme ela corre; teleportar para o meio da cena não
+> os move junto. Nos primeiros segundos ainda aparecem casas onde deveria haver
+> clareira — inclusive tapando o Big Ben. Espere uns 10 s antes de julgar o
+> enquadramento. Correndo de verdade isso nunca acontece.
 
 ## Decisões que valem saber
 

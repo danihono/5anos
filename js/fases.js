@@ -94,15 +94,9 @@ export const FASES = [
     lojas: true, coresLoja: ['#c02a3e', '#2f7a68', '#3f5a9c', '#8a5aa8', '#d08a2a'],
     coresPorta: ['#2f5a8c', '#1f6b52', '#8e2436', '#3c3160', '#c07a1e', '#1d1b22'],
 
-    // Marcos por onde ela PASSA: a fileira de casas abre uma clareira do lado
-    // esquerdo e ali ficam o Parlamento, de fachada comprida rente à rua, e o
-    // Big Ben na ponta norte dele — como na cidade de verdade.
-    pontos: [
-      { tipo: 'parlamento', x: -64, z: 560, rot: Math.PI / 2, escala: 0.72,
-        claro: 420, lado: -1, piso: 'praca' },
-      { tipo: 'bigben', x: -34, z: 462, escala: 0.9,
-        legenda: 'Big Ben. Marcando o tempo que a gente já ganhou.', aviso: 190 },
-    ],
+    // Westminster mudou para a cena da noite, onde a torre pode ser iluminada
+    // de verdade. Aqui ficou só a fileira pastel contínua, que já é bonita.
+    pontos: [],
 
     padroes: PADROES_RUA,
     camera: { exposicao: 0.94, bloom: 0.5, vinheta: 0.3, grao: 0.004, gotas: 0.5, aberracao: 0,
@@ -163,25 +157,30 @@ export const FASES = [
     legenda: 'É aqui. A luz acesa no fim da rua é para você.',
     tipo: 'rua',
     semente: 20260814,
-    comprimento: 800,
+    comprimento: 1000,
     velocidadeInicial: 13,
     velocidadeFinal: 16.5,
     cartas: [8, 9, 10],
 
+    /* Noite de verdade, não fim de tarde. O horizonte lavanda claro que estava
+       aqui antes era também a cor da neblina, e por isso a torre iluminada
+       aparecia como um fantasma pálido: claro sobre claro. Céu fundo + neblina
+       rala = o dourado do Big Ben tem contra o que brilhar. */
     paleta: {
-      ceuAlto: '#2b4a86', ceuHorizonte: '#a9a2c4', ceuBaixo: '#6d6690',
+      ceuAlto: '#0d1b3e', ceuHorizonte: '#3c3a63', ceuBaixo: '#211f40',
       corSol: '#ffd7a8', dirSol: [0.45, 0.3, -0.6], tamanhoSol: 220,
-      forcaSol: 1.2, neblinaCeu: 0.7,
+      forcaSol: 1.2, neblinaCeu: 0.55,
     },
-    neblina: 0.0072,
+    neblina: 0.004,
     forcaHalo: 0.03,
     dirLuz: [0.4, 0.66, -0.5],
     corSol: '#b9c3ea', forcaLuzSol: 0.95,
-    corCeuLuz: '#6b81be', corChaoLuz: '#3e3442', forcaHemisferio: 1.0,
+    corCeuLuz: '#4a5c96', corChaoLuz: '#3e3442', forcaHemisferio: 0.88,
     corPoste: '#ffc070', forcaPoste: 24,
     sombra: 0.5,
 
-    chuva: 0.3, corChuva: '#cbd8ea', vento: [-0.9, 0],
+    // garoa discreta: contra o céu agora fundo, a chuva clara virava risco
+    chuva: 0.3, corChuva: '#8ea3c6', vento: [-0.9, 0],
     molhado: 0.85, pedra: true,
 
     coresPredio: ['#e8c8cd', '#c3dcd6', '#eedcc0', '#cfd2ea', '#e6c4b4'],
@@ -190,7 +189,37 @@ export const FASES = [
     coresPorta: ['#2f5a8c', '#1f6b52', '#8e2436', '#3c3160', '#1d1b22'],
 
     pontos: [
-      { tipo: 'ponte', x: 0, z: 396, escala: 1, claro: 176, lado: 0, piso: 'agua',
+      /* O CORAÇÃO DA CENA. É o lugar preferido dela, então o Big Ben não é
+         marco de passagem: a fileira de casas abre, os holofotes lavam a
+         pedra, os quatro relógios acendem e os sinos tocam. A janela de
+         `olhada` é calculada: a 76° de abertura uma torre de 100 m precisa de
+         ~123 m de distância para caber, e entre z=120 e z=205 ela está a
+         210–125 m. Cabe inteira o tempo todo. */
+      /* O Palácio corre para o sul a partir da torre, como o de verdade. Bem
+         afastado da rua: a 34 m ele entrava no quadro pelo canto direito como
+         um paredão preto de 19 m quando ela passava ao lado. */
+      { tipo: 'parlamento', x: -52, z: 450, rot: Math.PI / 2, escala: 0.72, noturno: true },
+
+      /* A clareira é do Big Ben, não do Parlamento: precisa começar ANTES da
+         janela da olhada, senão a última casa da fileira tapa a torre bem na
+         hora de olhar. De z=100 a z=560, com o Parlamento inteiro dentro. */
+      { tipo: 'bigben', x: -34, z: 330, escala: 0.92, noturno: true, badalada: true,
+        claro: 460, lado: -1, piso: 'praca', larguraPiso: 56, rio: true,
+        legenda: 'O Big Ben. O lugar preferido dela, aceso só para ela passar.',
+        aviso: 210,
+        /* Enquadramento medido, não chutado. A câmera fica a 4,05 m do chão e
+           20,6 m atrás dela, mirando a 38 m de altura na torre. No auge da
+           janela (dist ≈ 216) a torre ocupa 37° dos 70° de abertura — mais da
+           metade da tela — com o topo 21° acima do eixo e a menina 23° abaixo:
+           os dois dentro dos 35° de meia-abertura, do começo ao fim.
+           Mirar mais alto encheria mais o quadro, mas jogaria ela para fora —
+           e ela continua correndo, então continua na tela.
+           O desfoque de fundo também abre: com dofLonge de 120 m a torre
+           virava mancha justamente aqui. */
+        olhada: { de: 118, ate: 240, fov: 70, recuo: 14, subida: 1.2,
+                  mira: [-30, 38, 330], dofPerto: 170, dofLonge: 620 } },
+
+      { tipo: 'ponte', x: 0, z: 620, escala: 1, claro: 176, lado: 0, piso: 'agua',
         // a travessia é um momento, não um teste: nada de obstáculo em cima da ponte
         limpo: 62,
         legenda: 'Tower Bridge. Do outro lado do rio já dá para ver a agência.', aviso: 110 },
@@ -243,9 +272,13 @@ export function gerarTrajeto(fase) {
   // Trechos que são momento, não desafio: a travessia da ponte fica sem
   // obstáculo. Filtrar aqui em vez de na hora de instanciar mantém o
   // validador vendo o trajeto de verdade.
-  const limpos = (fase.pontos || [])
-    .filter((p) => p.limpo)
-    .map((p) => ({ de: p.z - p.limpo / 2, ate: p.z + p.limpo / 2 }));
+  const limpos = [];
+  for (const p of (fase.pontos || [])) {
+    if (p.limpo) limpos.push({ de: p.z - p.limpo / 2, ate: p.z + p.limpo / 2 });
+    // se a câmera está virada para o marco, nada pode estar no caminho —
+    // isso é justiça com quem joga, não enfeite
+    if (p.olhada) limpos.push({ de: p.olhada.de - 12, ate: p.olhada.ate + 22 });
+  }
   const filtrado = itens.filter((it) => {
     if (COMO_PASSAR[it.tipo] === 'livre') return true;
     return !limpos.some((c) => it.z > c.de && it.z < c.ate);
