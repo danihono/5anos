@@ -618,6 +618,18 @@ function criarPontos(fase, alvo, preset) {
  * O que faz uma caixa de 62 m parecer uma torre gótica é o ritmo vertical:
  * pilastras subindo de ponta a ponta, cordões horizontais marcando os
  * pavimentos e janelas estreitas e altas entre elas. Sem isso era um paredão.
+ *
+ * As medidas e as cores são as de verdade, conferidas (ver LEIA-ME):
+ *   96,3 m de altura, base de 12 m de lado, alvenaria de pedra de Anston até
+ *   61 m e daí para cima uma flecha de ferro fundido; quatro mostradores de
+ *   6,9 m de diâmetro a 54,9 m do chão, com 324 peças de vidro opala leitoso;
+ *   ponteiros, algarismos e a treliça de ferro em AZUL DA PRÚSSIA, aro e
+ *   folhas de ouro, cantos em azul cobalto. À noite os mostradores são
+ *   iluminados por trás (desde 1859; hoje LED) com um amarelo quente, e a
+ *   pedra recebe refletores dourados de baixo para cima. Em cima do
+ *   campanário fica a Luz de Ayrton, acesa quando o Parlamento está reunido.
+ *
+ * A escala em `fases.js` é 0.92, então aqui tudo é medida real ÷ 0.92.
  */
 function fazBigBen({ noturno = false, preset = null } = {}) {
   const g = new Group();
@@ -631,6 +643,12 @@ function fazBigBen({ noturno = false, preset = null } = {}) {
     color: new Color('#e0b055'), roughness: 0.35, metalness: 0.75,
     emissive: new Color('#7a5a1c'), emissiveIntensity: 0.9,
   });
+  /* Azul da Prússia: a cor que apareceu debaixo de camadas de fuligem e tinta
+     preta no restauro de 2017-2022 e voltou a ser a original de Barry. É ela
+     que desenha o relógio — contra o vidro aceso, ponteiros e algarismos são
+     silhuetas escuras, e é assim que o olho reconhece o Big Ben. */
+  const matPrussia = new MeshStandardMaterial({ color: new Color('#0b2f4f'), roughness: 0.55 });
+  const matCobalto = new MeshStandardMaterial({ color: new Color('#14428c'), roughness: 0.6 });
 
   const L = 11;         // lado da torre
   const H = 62;         // altura do fuste
@@ -659,9 +677,10 @@ function fazBigBen({ noturno = false, preset = null } = {}) {
     g.add(pil);
   }
 
-  // cordões horizontais e janelas altas entre eles
+  // cordões horizontais e janelas altas entre eles — param antes dos 54 m,
+  // onde começa o estágio dos mostradores
   for (let piso = 0; piso < 5; piso++) {
-    const y = 8 + piso * 11;
+    const y = 5 + piso * 10;
     const cordao = new Mesh(new BoxGeometry(L + 1, 0.9, L + 1), matSombra);
     cordao.position.y = y - 3.4;
     g.add(cordao);
@@ -677,13 +696,16 @@ function fazBigBen({ noturno = false, preset = null } = {}) {
     }
   }
 
-  const relogioBase = new Mesh(new BoxGeometry(12.4, 12, 12.4), matPedra);
-  relogioBase.position.y = 66;
+  /* Estágio dos mostradores: os relógios de verdade ficam a 54,9 m, ou seja
+     DENTRO da alvenaria e não numa caixa em cima dela — 54.9/0.92 ≈ 60. */
+  const Y_RELOGIO = 60;
+  const relogioBase = new Mesh(new BoxGeometry(12.4, 13, 12.4), matPedra);
+  relogioBase.position.y = Y_RELOGIO;
   relogioBase.castShadow = true;
   g.add(relogioBase);
   // anel dourado sob o estágio do relógio
   const anelOuro = new Mesh(new BoxGeometry(13, 0.7, 13), matDourado);
-  anelOuro.position.y = 59.6;
+  anelOuro.position.y = Y_RELOGIO - 6.9;
   g.add(anelOuro);
 
   /* Os quatro mostradores. De noite eles são o herói do quadro: vidro opala
@@ -691,67 +713,138 @@ function fazBigBen({ noturno = false, preset = null } = {}) {
      para o bloom abrir halo em volta. Mais o aro dourado, que é o detalhe que
      faz o olho reconhecer o relógio mesmo de longe. */
   const matMostrador = new MeshStandardMaterial({
-    color: new Color(noturno ? '#fff0cc' : '#f3e2b4'),
-    emissive: new Color(noturno ? '#ffcf7a' : '#ffd98a'),
-    // 9 estourava: a 135 m o mostrador tem 33 px e virava um farol branco sem
-    // aro nem ponteiro. 4.5 deixa o disco âmbar legível com halo em volta.
-    emissiveIntensity: noturno ? 4.5 : 2.6,
+    // vidro opala leitoso, aceso por trás: branco quente, não âmbar
+    color: new Color(noturno ? '#fff6e6' : '#f3e2b4'),
+    emissive: new Color(noturno ? '#ffdca4' : '#ffd98a'),
+    /* A treliça e os ponteiros escuros comem boa parte do disco, então o vidro
+       precisa vir mais forte para o conjunto ainda ler como "aceso": a graça é
+       o desenho azul RECORTADO contra a luz, não um disco azul. */
+    emissiveIntensity: noturno ? 5.5 : 2.6,
     roughness: 1,
   });
   const matAro = new MeshStandardMaterial({
     color: new Color('#e0b055'), roughness: 0.3, metalness: 0.8,
     emissive: new Color('#8a6520'), emissiveIntensity: noturno ? 1.6 : 0.5,
   });
+
+  const R = 3.75;              // 6,9 m de diâmetro ÷ 0.92, dividido por 2
   for (let i = 0; i < 4; i++) {
     const ang = (i / 4) * TAU;
     const px = Math.sin(ang) * 6.3;
     const pz = Math.cos(ang) * 6.3;
+    /* Empilhamento por RAIO absoluto, não por fator. A parede do estágio está
+       em 6.2; cada camada tem espessura, e multiplicar a posição por 0.99 não
+       garante nada — foi assim que a caixa do painel de trás (0,3 m de fundo)
+       ficou com a cara À FRENTE do vidro e apagou o relógio. */
+    const emRaio = (r) => [Math.sin(ang) * r, Y_RELOGIO, Math.cos(ang) * r];
 
-    const face = new Mesh(new CircleGeometry(4.4, 28), matMostrador);
-    face.position.set(px, 66, pz);
+    /* Moldura dourada e canto em azul cobalto: o painel quadrado atrás do
+       disco, que separa o relógio da pedra. De noite é fundo, não figura. */
+    const moldura = new Mesh(new BoxGeometry(10.4, 10.4, 0.18), matDourado);
+    moldura.position.set(...emRaio(6.28));
+    moldura.rotation.y = ang;
+    g.add(moldura);
+    const canto = new Mesh(new BoxGeometry(9, 9, 0.16), matCobalto);
+    canto.position.set(...emRaio(6.4));
+    canto.rotation.y = ang;
+    g.add(canto);
+
+    const face = new Mesh(new CircleGeometry(R, 28), matMostrador);
+    face.position.set(...emRaio(6.54));
     face.rotation.y = ang;
     g.add(face);
 
-    const aro = new Mesh(new TorusGeometry(4.6, 0.34, 8, 28), matAro);
-    aro.position.set(px * 1.01, 66, pz * 1.01);
+    const aro = new Mesh(new TorusGeometry(R + 0.2, 0.28, 8, 28), matAro);
+    aro.position.set(...emRaio(6.58));
     aro.rotation.y = ang;
     g.add(aro);
+
+    /* A treliça de ferro que divide o vidro em painéis, os algarismos em volta
+       e os ponteiros — tudo em azul da Prússia. Contra o vidro aceso viram
+       silhueta, e é justamente esse desenho escuro sobre o disco claro que faz
+       alguém dizer "é o Big Ben" mesmo com o relógio ocupando 30 pixels. */
+    const grade = new Group();
+    grade.position.set(...emRaio(6.64));
+    grade.rotation.y = ang;
+    g.add(grade);
+
+    for (let r = 0; r < 4; r++) {                       // raios da treliça
+      const raio = new Mesh(new BoxGeometry(0.1, R * 2 - 0.3, 0.1), matPrussia);
+      raio.rotation.z = (r / 4) * Math.PI;
+      grade.add(raio);
+    }
+    const anel = new Mesh(new TorusGeometry(R * 0.72, 0.08, 6, 24), matPrussia);
+    grade.add(anel);
+    for (let n = 0; n < 12; n++) {                      // os doze algarismos
+      const a = (n / 12) * TAU;
+      const num = new Mesh(new BoxGeometry(0.24, 0.44, 0.1), matPrussia);
+      num.position.set(Math.sin(a) * R * 0.87, Math.cos(a) * R * 0.87, 0.03);
+      num.rotation.z = -a;
+      grade.add(num);
+    }
 
     /* Ponteiros. O pivô tem que ficar no CENTRO do mostrador, então cada um
        é um grupo girado em Z com a haste deslocada para fora — girar a malha
        direto botaria o eixo no meio da haste. */
     const eixo = new Group();
-    eixo.position.set(px * 1.02, 66, pz * 1.02);
+    eixo.position.set(...emRaio(6.7));
     eixo.rotation.y = ang;
     g.add(eixo);
-    for (const [comp, larg, giro] of [[3.1, 0.26, -0.9], [2.2, 0.36, 2.1]]) {
+    for (const [comp, larg, giro] of [[R * 0.82, 0.22, -0.9], [R * 0.58, 0.3, 2.1]]) {
       const braco = new Group();
       braco.rotation.z = giro;
       eixo.add(braco);
-      const ponteiro = new Mesh(new BoxGeometry(larg, comp, 0.18), matAro);
-      ponteiro.position.y = comp / 2 - 0.35;
+      const ponteiro = new Mesh(new BoxGeometry(larg, comp, 0.15), matPrussia);
+      ponteiro.position.y = comp / 2 - 0.3;
       braco.add(ponteiro);
     }
+    const miolo = new Mesh(new CylinderGeometry(0.3, 0.3, 0.14, 10), matDourado);
+    miolo.rotation.x = Math.PI / 2;
+    miolo.position.set(...emRaio(6.78));
+    g.add(miolo);
   }
 
+  /* Do campanário para cima é flecha de ferro fundido, não alvenaria: são
+     35 dos 96 m da torre. Antes o fuste ia alto demais e sobrava um bico
+     curto em cima — a silhueta ficava atarracada. */
+  const Y_SINO = 71;
   const belfry = new Mesh(new BoxGeometry(11.5, 9, 11.5), matPedra);
-  belfry.position.y = 77;
+  belfry.position.y = Y_SINO;
   belfry.castShadow = true;
   g.add(belfry);
   // aberturas do campanário, onde fica o sino que dá nome à torre
   for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
     const abertura = new Mesh(new BoxGeometry(dz ? 6.4 : 0.4, 6, dx ? 6.4 : 0.4),
       new MeshStandardMaterial({ color: new Color('#3d3a33'), roughness: 0.95 }));
-    abertura.position.set(dx * 5.8, 77, dz * 5.8);
+    abertura.position.set(dx * 5.8, Y_SINO, dz * 5.8);
     g.add(abertura);
   }
-  const pyramid = new Mesh(new ConeGeometry(8.4, 16, 4), matSombra);
-  pyramid.position.y = 89.5;
+
+  /* A Luz de Ayrton: a lanterna em cima do campanário, posta em 1885 a pedido
+     da rainha Victoria para ela saber do Palácio de Buckingham quando o
+     Parlamento estava reunido depois de escurecer. Acesa, é o ponto mais alto
+     e mais brilhante da torre. */
+  const baseAyrton = new Mesh(new CylinderGeometry(1.5, 1.9, 1.2, 10), matSombra);
+  baseAyrton.position.y = Y_SINO + 5.4;
+  g.add(baseAyrton);
+  const lanterna = new Mesh(new CylinderGeometry(1.25, 1.25, 2.6, 10), new MeshStandardMaterial({
+    color: new Color(noturno ? '#fff6e0' : '#cfd6d2'),
+    emissive: new Color(noturno ? '#ffe0a8' : '#000000'),
+    emissiveIntensity: noturno ? 5 : 0, roughness: 1,
+  }));
+  lanterna.position.y = Y_SINO + 7.3;
+  g.add(lanterna);
+  const chapeuAyrton = new Mesh(new ConeGeometry(1.7, 1.4, 10), matDourado);
+  chapeuAyrton.position.y = Y_SINO + 9.3;
+  g.add(chapeuAyrton);
+
+  const pyramid = new Mesh(new ConeGeometry(8.4, 15, 4), matSombra);
+  pyramid.position.y = Y_SINO + 12;
   pyramid.rotation.y = Math.PI / 4;
   pyramid.castShadow = true;
   g.add(pyramid);
-  const flecha = new Mesh(new ConeGeometry(1.4, 9, 8), matDourado);
-  flecha.position.y = 101;
+  const flecha = new Mesh(new ConeGeometry(1.4, 10, 8), matDourado);
+  flecha.position.y = Y_SINO + 24;
   g.add(flecha);
 
   /* Holofotes lavando a pedra de baixo para cima — é assim que a torre de
@@ -764,7 +857,7 @@ function fazBigBen({ noturno = false, preset = null } = {}) {
     for (const [lx, lz] of posicoes) {
       const refletor = new SpotLight(new Color('#ffd9a0'), 1500, 190, 0.34, 0.85, 1.4);
       refletor.position.set(lx, 1.2, lz);
-      refletor.target.position.set(lx * 0.25, 74, lz * 0.25);
+      refletor.target.position.set(lx * 0.25, 62, lz * 0.25);
       refletor.castShadow = false;
       g.add(refletor, refletor.target);
 
@@ -786,8 +879,12 @@ function fazBigBen({ noturno = false, preset = null } = {}) {
        escorrer na pedra em volta em vez de ficar preso na face. É o detalhe
        que faz o relógio parecer aceso, e não colado. */
     const brilhoRelogio = new PointLight(new Color('#ffcf82'), 240, 46, 1.8);
-    brilhoRelogio.position.set(0, 66, 0);
+    brilhoRelogio.position.set(0, Y_RELOGIO, 0);
     g.add(brilhoRelogio);
+
+    const luzAyrton = new PointLight(new Color('#ffe6b8'), 90, 28, 1.6);
+    luzAyrton.position.set(0, Y_SINO + 7.3, 0);
+    g.add(luzAyrton);
   }
 
   return g;

@@ -56,6 +56,37 @@ Sem esses parâmetros o jogo começa do início, como deve.
 > clareira — inclusive tapando o Big Ben. Espere uns 10 s antes de julgar o
 > enquadramento. Correndo de verdade isso nunca acontece.
 
+## O Big Ben é copiado do de verdade
+
+A Torre Elizabeth é o coração da cena 3 e não é invenção: as medidas e as cores
+saíram de pesquisa, e `fazBigBen` em `js/mundo.js` segue esta ficha (a escala em
+`fases.js` é 0.92, então lá dentro tudo é medida real ÷ 0.92).
+
+| | de verdade |
+|---|---|
+| altura | 96,3 m; base quadrada de 12 m de lado |
+| estrutura | alvenaria de pedra de Anston até 61 m; daí para cima, flecha de ferro fundido |
+| mostradores | quatro, 6,9 m de diâmetro, a 54,9 m do chão, 324 peças de vidro opala leitoso |
+| algarismos e ponteiros | **azul da Prússia** — a cor original de Barry, achada sob fuligem e tinta preta no restauro de 2017-2022 |
+| moldura e detalhes | aro dourado e folha de ouro; cantos do painel em azul cobalto |
+| relógio à noite | aceso por trás desde 1859 (hoje LED), amarelo quente |
+| pedra à noite | refletores dourados de baixo para cima, LED desde 2012, desenhando as pilastras |
+| Luz de Ayrton | lanterna acima do campanário, posta em 1885 a pedido da rainha Victoria; acesa quando o Parlamento está reunido depois de escurecer |
+
+Duas coisas aprendidas ajustando isso, e que valem para qualquer detalhe novo:
+
+**Detalhe fino some, mas escurece.** A primeira treliça tinha oito raios, dois
+anéis e doze algarismos. A 150 m o mostrador tem uns 30 pixels: nada daquilo
+resolvia, e o que sobrava era a média — um disco azul apagado no lugar de um
+relógio aceso. Ficaram quatro raios, um anel e algarismos menores.
+
+**Empilhe por raio absoluto, não por fator.** As camadas do mostrador (moldura,
+painel, vidro, aro, treliça, ponteiros) têm espessura. Posicionar cada uma
+multiplicando o raio por 0.99, 1.01, 1.02 parecia certo e não era: a caixa do
+painel de trás tem 0,3 m de fundo, e a cara dela acabava na frente do vidro —
+o relógio simplesmente não acendia. Agora cada camada tem seu raio em metros,
+a partir da parede do estágio em 6.2.
+
 ## Decisões que valem saber
 
 **Ninguém pode travar antes das cartas.** Isso guia o jogo inteiro: três corações, checkpoint a cada terço de cena, retorno automático, um modo mais leve oferecido depois de duas quedas no mesmo ponto, e um link "ir direto para as cartas" sempre visível num canto. O `validarTrajeto` em `js/fases.js` confere a cada meio metro que sobra pelo menos uma faixa livre, e reclama no console se algum padrão novo quebrar isso.
