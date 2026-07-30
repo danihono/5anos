@@ -175,22 +175,37 @@ export const FASES = [
        seja 0.49) já é noite fechada, que é onde ela precisa estar acesa. A
        segunda metade corre no escuro e entrega a cena 3, que também é noite. */
     anoitece: { de: 0.03, ate: 0.5 },
-    /* Hora azul, não pôr do sol. A primeira versão terminava num laranja
-       enorme: `neblinaCeu` 0.5 remistura a cor do horizonte até 24° de
-       elevação, então o laranja subia por dois terços da tela e a roda acesa
-       competia com o fundo em vez de brilhar sobre ele. Aqui o alto do céu é
-       marinho fundo e o laranja fica numa faixa baixa, que é o resto do sol
-       indo embora. É contra esse azul que as cápsulas coloridas aparecem. */
+    /* Hora azul, não pôr do sol.
+
+       A primeira versão terminava num laranja enorme e depois num vermelho
+       enorme, e o motivo é geometria do céu, não a cor escolhida: o degradê é
+       `mix(horizonte, alto, smoothstep(0, 0.55, h))`, então a cor do HORIZONTE
+       ainda vale 30% a dezesseis graus de elevação. Uma cor de pôr do sol ali
+       pinta metade da tela — e como a saturação da cena é 1.24, o verde e o
+       azul são esmagados e sobra lava. Quatrocentos metros correndo dentro de
+       um campo laranja chapado é a mesma queixa que o Daniel já fez uma vez,
+       só que noutra cor.
+
+       O conserto tem duas metades, e eu só acertei a segunda na terceira
+       tentativa. A primeira é escurecer o horizonte, quase até a cor do alto.
+       A segunda é `forcaSol`, que eu tinha SUBIDO para 2.1 achando que ia
+       concentrar o brilho — só que ela multiplica os dois termos do céu, e o
+       segundo é `pow(cosA, 3)`, um lóbulo de quase quarenta graus de raio.
+       Subir a força triplicou justamente o clarão largo que eu queria matar.
+       Ela desce para 0.5: o disco do sol continua lá, baixo e à esquerda, e o
+       céu volta a ser noite. É contra esse azul que a roda aparece. */
     paletaFim: {
-      ceuAlto: '#0a1236', ceuHorizonte: '#66352a', ceuBaixo: '#241a30',
-      corSol: '#ff7a3a', dirSol: [0.62, -0.015, 0.75], tamanhoSol: 420,
-      forcaSol: 0.7, neblinaCeu: 0.18,
+      // roxo, não vermelho: no ângulo em que a faixa do horizonte cai (3° a
+      // 17° de elevação) o vermelho puro dava fogo, e o que se quer é hora azul
+      ceuAlto: '#080d26', ceuHorizonte: '#41263f', ceuBaixo: '#151129',
+      corSol: '#ff8a4a', dirSol: [0.62, -0.015, 0.75], tamanhoSol: 260,
+      forcaSol: 0.5, neblinaCeu: 0.14,
     },
     neblinaFim: 0.0044,
     /* A neblina do mundo tem cor própria no fim. Antes ela seguia
        `ceuHorizonte`, e com o horizonte laranja tudo o que estava longe —
        árvores, água, a roda inteira — recebia banho de laranja. */
-    corNeblinaFim: '#232a52',
+    corNeblinaFim: '#1c2246',
     corSolFim: '#ff8a55', forcaLuzSolFim: 0.3,
     corCeuLuzFim: '#33477e', corChaoLuzFim: '#2b2734', forcaHemisferioFim: 0.46,
     ambienteFim: 0.16,

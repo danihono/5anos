@@ -1185,22 +1185,37 @@ function fazRodaGigante() {
 /**
  * Piccadilly Circus. O que faz alguém reconhecer o lugar é uma coisa só: o
  * paredão curvo de telões acesos na esquina. Tudo o mais aqui é moldura para
- * ele — o prédio que o segura, a fonte do Eros embaixo, os ônibus vermelhos.
+ * ele — o quarteirão de pedra que fecha a praça, a fonte do Eros embaixo, os
+ * ônibus vermelhos e o asfalto rabiscado de faixas.
  *
- * Os painéis são blocos de cor grandes e chapados, de propósito. A lição que
- * já custou caro duas vezes nesta cena (a treliça do relógio do Big Ben, o aro
- * da London Eye): a 100 m, detalhe mais fino que um pixel não desenha, só
- * acinzenta. Telão de verdade tem imagem; este tem faixas de cor enormes, que
- * é o que sobrevive à distância e ainda lê como "telão".
+ * A primeira versão tinha só a fachada, e o Daniel viu o que sobrava: um
+ * outdoor solto no meio de um estacionamento. Praça é um lugar CERCADO — sem o
+ * quarteirão em volta e sem marcação no chão, o cruzamento não existe.
+ *
+ * Os painéis são blocos de cor grandes, de propósito. A lição que já custou
+ * caro três vezes nesta cena (a treliça do relógio do Big Ben, o aro da London
+ * Eye, os primeiros painéis): a 100 m, detalhe mais fino que um pixel não
+ * desenha, só acinzenta. Telão de verdade tem imagem; este tem três ou quatro
+ * blocos enormes dentro de cada painel, que é o que sobrevive à distância e
+ * ainda lê como "telão ligado".
  */
 function fazPiccadilly(fase) {
   const g = new Group();
   const matPedra = new MeshStandardMaterial({ color: new Color('#c9bfae'), roughness: 0.9 });
+  const matPedraFria = new MeshStandardMaterial({ color: new Color('#aca492'), roughness: 0.92 });
   const matEscuro = new MeshStandardMaterial({ color: new Color('#26252b'), roughness: 0.8 });
   const matVitrine = new MeshStandardMaterial({
     color: new Color('#ffe7bd'), emissive: new Color('#ffca7a'),
     emissiveIntensity: 1.7, roughness: 1,
   });
+  const matFaixa = new MeshStandardMaterial({ color: new Color('#e9e6dc'), roughness: 0.95 });
+  const matAmarelo = new MeshStandardMaterial({ color: new Color('#b39442'), roughness: 0.95 });
+  const matCalcada = new MeshStandardMaterial({ color: new Color('#b9b3a6'), roughness: 0.95 });
+
+  /* O centro da praça. Tudo o que fecha o cruzamento se vira para cá — é o
+     único jeito de um punhado de caixas ler como quarteirão em volta de um
+     largo, e não como prédios enfileirados de costas uns para os outros. */
+  const CX = 30, CZ = 4;
 
   // o asfalto largo do cruzamento
   const chao = new Mesh(new PlaneGeometry(76, 128),
@@ -1210,19 +1225,150 @@ function fazPiccadilly(fase) {
   chao.receiveShadow = true;
   g.add(chao);
 
-  /* A FACHADA. Uma só, girada para olhar para dentro do cruzamento e não para
-     quem vem pela rua — era essa a queixa do Daniel sobre a primeira versão,
-     que eram sete torres separadas todas apontadas para a frente. */
+  /* ── o chão pintado ────────────────────────────────────────────────────
+     Asfalto liso de 76 por 128 metros é o que fazia a praça parecer um pátio.
+     Faixa de pedestre, linha de retenção, setas e amarelo duplo no meio-fio
+     custam quatro planos cada e resolvem sozinhos metade do problema. */
+  const geoMarca = new PlaneGeometry(1, 1);
+  function marca(x, z, larg, comp, mat = matFaixa, giro = 0) {
+    const m = new Mesh(geoMarca, mat);
+    m.rotation.x = -Math.PI / 2;
+    m.rotation.z = giro;
+    m.position.set(x, 0.17, z);
+    m.scale.set(larg, comp, 1);
+    g.add(m);
+  }
+
+  /* Travessia larga na boca da praça. Barras compridas e juntas: a primeira
+     tentativa tinha barras de 1,7 por 7,5 com 3,1 de passo e lia como
+     tracejado de faixa de rolamento, não como travessia. */
+  for (let i = 0; i < 13; i++) {
+    marca(3 + i * 2.9, 14, 1.9, 11, matFaixa, -0.3);
+  }
+  // linha de retenção antes da travessia, dos dois sentidos
+  marca(19, 22.5, 34, 0.7);
+  marca(19, 5.5, 34, 0.7);
+  // eixo do cruzamento, tracejado
+  for (let i = 0; i < 7; i++) marca(10 + i * 8.4, -22, 4.6, 0.55);
+  for (let i = 0; i < 5; i++) marca(54, -30 + i * 9, 0.55, 4.6);
+  /* Amarelo duplo no meio-fio da rua dela. Fino e sujo de propósito: a 0,28 de
+     largura e amarelo puro virava uma tarja de pista de corrida atravessando
+     a tela inteira, que é a primeira coisa que o olho ia procurar. */
+  for (const dx of [0, 0.42]) marca(4.9 + dx, 0, 0.16, 118, matAmarelo);
+
+  /* ── o quarteirão que fecha a praça ───────────────────────────────────
+     Pedra eduardiana: fachada texturizada (a mesma fábrica da rua toda, então
+     não custa textura nova), cornija, platibanda e uma faixa de vitrines
+     acesas no térreo. Cada bloco olha para o centro. */
+  /* `loja: false` de propósito. A textura desenha a loja no rodapé dela, e
+     esticada num bloco de 21 m a tarja vinha parar a cinco metros do chão,
+     flutuando acima das vitrines que eu monto aqui embaixo. Aqui a textura
+     cuida só da parede e das janelas; o térreo é geometria. */
+  const texPedra = Mat.fachada({
+    semente: fase.semente + 401, andares: 6, tijolo: false, corBase: '#e2d7bf',
+    acesas: 0.34, corLuz: fase.corJanela || '#ffcf8f', loja: false,
+  });
+  const matQuarteirao = new MeshStandardMaterial({
+    map: texPedra.map,
+    emissiveMap: texPedra.emissiveMap || null,
+    emissive: new Color(fase.corJanela || '#ffcf8f'),
+    emissiveIntensity: texPedra.emissiveMap ? (fase.forcaJanela ?? 1.3) : 0,
+    roughness: 0.92, metalness: 0.02,
+  });
+
+  function quarteirao(x, z, larg, alt, prof) {
+    const b = new Group();
+    b.position.set(x, 0, z);
+    // a frente (+z local) vira para o centro da praça
+    b.rotation.y = Math.atan2(CX - x, CZ - z);
+
+    const corpo = new Mesh(geoCubo, matQuarteirao);
+    corpo.scale.set(larg, alt, prof);
+    corpo.position.y = alt / 2;
+    corpo.castShadow = true;
+    corpo.receiveShadow = true;
+    b.add(corpo);
+
+    const cornija = new Mesh(geoCubo, matPedra);
+    cornija.scale.set(larg + 1.2, 0.8, prof + 1.2);
+    cornija.position.y = alt + 0.4;
+    cornija.castShadow = true;
+    b.add(cornija);
+
+    const platibanda = new Mesh(geoCubo, matPedraFria);
+    platibanda.scale.set(larg + 0.3, 1.5, prof + 0.3);
+    platibanda.position.y = alt + 1.55;
+    b.add(platibanda);
+
+    // térreo: marquise escura e vitrines acesas na face que dá para a praça
+    const marq = new Mesh(new BoxGeometry(larg, 0.55, 2.2), matEscuro);
+    marq.position.set(0, 4.5, prof / 2 + 1);
+    b.add(marq);
+    const quantas = Math.max(2, Math.round(larg / 6));
+    for (let i = 0; i < quantas; i++) {
+      const v = new Mesh(new BoxGeometry(larg / quantas - 1.2, 3, 0.3), matVitrine);
+      v.position.set(-larg / 2 + larg / quantas * (i + 0.5), 2.5, prof / 2 + 0.16);
+      b.add(v);
+    }
+
+    /* Calçada na frente. Sem ela os prédios brotavam direto do asfalto e a
+       praça continuava lendo como pátio: é o degrau de doze centímetros que
+       diz onde acaba a rua e começa quem anda. */
+    const cal = new Mesh(new BoxGeometry(larg + 8, 0.3, 7), matCalcada);
+    cal.position.set(0, 0.16, prof / 2 + 3.4);
+    cal.receiveShadow = true;
+    b.add(cal);
+
+    g.add(b);
+    return b;
+  }
+
+  /* O arco de quarteirões. Deixa aberta a boca da rua por onde ela vem (z
+     baixo, x perto de zero) e o vão por onde a rua continua. */
+  quarteirao(54, 42, 26, 21, 13);
+  quarteirao(70, 16, 22, 24, 13);
+  quarteirao(68, -16, 20, 18, 13);
+  quarteirao(52, -42, 24, 21, 13);
+  /* Este ficava em x=14 e a rua PASSA POR DENTRO dele: com 24 m de largura, a
+     face chegava a x≈1 e a menina entrava na parede aos 520 m, com a tela
+     virando um paredão creme. A varredura das três cenas inteiras foi o que
+     mostrou — no enquadramento da olhada ele estava fora do quadro. */
+  quarteirao(28, 62, 24, 22, 13);
+
+  /* A FACHADA DOS TELÕES. Uma só, girada para olhar para dentro do cruzamento
+     e não para quem vem pela rua — era essa a queixa do Daniel sobre a
+     primeira versão, que eram sete torres separadas todas apontadas para a
+     frente. */
   const fachada = new Group();
   fachada.position.set(26, 0, 32);
   fachada.rotation.y = Math.PI + 0.62;
   g.add(fachada);
 
   const LARG = 34, ALT = 26;
-  const predio = new Mesh(new BoxGeometry(LARG, ALT + 8, 14), matPedra);
+  const predio = new Mesh(new BoxGeometry(LARG, ALT + 8, 14), matQuarteirao);
   predio.position.set(0, (ALT + 8) / 2, -7.4);
   predio.castShadow = true;
   fachada.add(predio);
+
+  /* Cornija e platibanda no alto. Sem elas o prédio era uma laje cinza cortada
+     reta no céu: a coisa mais fácil de arrumar e a que mais mudava. */
+  const cornijaF = new Mesh(new BoxGeometry(LARG + 1.6, 1, 16), matPedra);
+  cornijaF.position.set(0, ALT + 8.4, -7.4);
+  cornijaF.castShadow = true;
+  fachada.add(cornijaF);
+  const platF = new Mesh(new BoxGeometry(LARG + 0.4, 1.8, 14.6), matPedraFria);
+  platF.position.set(0, ALT + 9.8, -7.4);
+  fachada.add(platF);
+  // fileira de janelas na faixa de pedra que sobra acima dos telões
+  for (let i = 0; i < 7; i++) {
+    const jan = new Mesh(new BoxGeometry(2.4, 3, 0.3), matEscuro);
+    jan.position.set(-LARG / 2 + 3.4 + i * 4.5, ALT + 4.6, 0.05);
+    fachada.add(jan);
+    const peit = new Mesh(new BoxGeometry(3, 0.4, 0.5), matPedra);
+    peit.position.set(jan.position.x, ALT + 2.9, 0.1);
+    fachada.add(peit);
+  }
+
   // o painel preto onde os telões são montados
   const fundo = new Mesh(new BoxGeometry(LARG - 1, ALT - 4, 0.6), matEscuro);
   fundo.position.set(0, 6 + (ALT - 4) / 2, -0.3);
@@ -1231,24 +1377,56 @@ function fazPiccadilly(fase) {
   /* O mosaico. É a IRREGULARIDADE que faz reconhecer o Piccadilly: um painel
      enorme, um alto e estreito ao lado, outro grande do outro lado e uma
      fileira de menores embaixo. Três faixas iguais nunca iam ler como o lugar.
-     Cada linha é [x, y, largura, altura] em fração da parede. */
+     Cada linha é [x, y, largura, altura] em fração da parede, mais a cor de
+     fundo e o desenho que vai por cima. */
   const MOSAICO = [
-    [0.02, 0.52, 0.42, 0.44, '#1f4fd8'],
-    [0.46, 0.74, 0.20, 0.22, '#e8b33a'],
-    [0.46, 0.52, 0.20, 0.20, '#d9d4c8'],
-    [0.68, 0.52, 0.30, 0.44, '#e01b2e'],
-    [0.02, 0.28, 0.30, 0.22, '#20c0d8'],
-    [0.34, 0.28, 0.30, 0.22, '#7c5cff'],
-    [0.66, 0.28, 0.32, 0.22, '#2f9ee0'],
-    [0.02, 0.06, 0.22, 0.20, '#ff7a1a'],
-    [0.26, 0.06, 0.30, 0.20, '#2fe08a'],
-    [0.58, 0.06, 0.18, 0.20, '#ff2f6d'],
-    [0.78, 0.06, 0.20, 0.20, '#ffd23f'],
+    [0.02, 0.52, 0.42, 0.44, '#1f4fd8', 'logo'],
+    [0.46, 0.74, 0.20, 0.22, '#e8b33a', 'tarja'],
+    [0.46, 0.52, 0.20, 0.20, '#d9d4c8', 'listras'],
+    [0.68, 0.52, 0.30, 0.44, '#e01b2e', 'logo'],
+    [0.02, 0.28, 0.30, 0.22, '#20c0d8', 'tarja'],
+    [0.34, 0.28, 0.30, 0.22, '#7c5cff', 'listras'],
+    [0.66, 0.28, 0.32, 0.22, '#2f9ee0', 'tarja'],
+    [0.02, 0.06, 0.22, 0.20, '#ff7a1a', 'listras'],
+    [0.26, 0.06, 0.30, 0.20, '#2fe08a', 'tarja'],
+    [0.58, 0.06, 0.18, 0.20, '#ff2f6d', 'logo'],
+    [0.78, 0.06, 0.20, 0.20, '#ffd23f', 'tarja'],
   ];
   const painel = [];
   const BASE = 6;                      // os telões começam acima das lojas
   const ALTURA_TELA = ALT - 5;
-  for (const [fx, fy, fw, fh, cor] of MOSAICO) {
+
+  /* O que vai DENTRO de cada painel. Um retângulo de cor chapada lia como
+     azulejo; anúncio de verdade tem uma tarja de texto embaixo, uma marca
+     grande no meio e uma faixa de contraste. Tudo em bloco enorme — nada aqui
+     tem menos de um metro e meio, que é o mínimo para desenhar a 100 m. */
+  function recheio(pai, w, h, cor, estilo) {
+    const base = new Color(cor);
+    const escuro = new Color().copy(base).multiplyScalar(0.16);
+    const claro = new Color().copy(base).offsetHSL(0, -0.55, 0.34);
+    const oposto = new Color().copy(base).offsetHSL(0.5, 0, 0.06);
+    const pecas = [];
+    if (estilo === 'logo') {
+      pecas.push([0, h * 0.08, w * 0.5, h * 0.42, oposto, 3.0]);
+      pecas.push([0, -h * 0.34, w * 0.86, h * 0.18, escuro, 0.5]);
+    } else if (estilo === 'tarja') {
+      pecas.push([0, h * 0.24, w * 0.86, h * 0.3, claro, 3.2]);
+      pecas.push([0, -h * 0.28, w * 0.86, h * 0.24, escuro, 0.5]);
+    } else {
+      pecas.push([-w * 0.24, 0, w * 0.34, h * 0.62, escuro, 0.5]);
+      pecas.push([w * 0.26, 0, w * 0.3, h * 0.62, claro, 3.2]);
+    }
+    for (const [px, py, pw, ph, cc, forca] of pecas) {
+      if (pw < 1.2 || ph < 1.2) continue;
+      const p = new Mesh(new BoxGeometry(pw, ph, 0.14), new MeshStandardMaterial({
+        color: cc, emissive: cc, emissiveIntensity: forca, roughness: 1,
+      }));
+      p.position.set(px, py, 0.25);
+      pai.add(p);
+    }
+  }
+
+  for (const [fx, fy, fw, fh, cor, estilo] of MOSAICO) {
     const w = fw * (LARG - 2), h = fh * ALTURA_TELA;
     const px = (fx + fw / 2) * (LARG - 2) - (LARG - 2) / 2;
     const py = BASE + fy * ALTURA_TELA + h / 2 - ALTURA_TELA * 0.03;
@@ -1256,6 +1434,7 @@ function fazPiccadilly(fase) {
       color: new Color(cor), emissive: new Color(cor), emissiveIntensity: 2.4, roughness: 1,
     }));
     tela.position.set(px, py, 0.25);
+    recheio(tela, w - 0.35, h - 0.35, cor, estilo);
     fachada.add(tela);
     painel.push(tela);
   }
@@ -1277,53 +1456,146 @@ function fazPiccadilly(fase) {
     g.add(brilho);
   }
 
+  /* ── semáforos ────────────────────────────────────────────────────────
+     Três postes com a caixa de três olhos. Ninguém vai parar para conferir
+     qual está aceso; o que eles fazem é dizer "isto aqui é um cruzamento". */
+  const matPoste = new MeshStandardMaterial({ color: new Color('#22252b'), roughness: 0.6, metalness: 0.3 });
+  const CORES_SEMAFORO = ['#e02a2a', '#e8a832', '#3fd06a'];
+  /* Nenhum deles no eixo da câmera: o primeiro estava em x=7, z=18, que é
+     exatamente a linha de visada do paredão — um risco preto de cinquenta
+     metros de comprimento bem no meio dos telões. */
+  for (const [sx, sz, giro, aceso] of [[5.6, 30, -0.3, 0], [44, 22, 2.6, 2], [58, -30, 0.2, 2]]) {
+    const s = new Group();
+    s.position.set(sx, 0, sz);
+    s.rotation.y = giro;
+    const poste = new Mesh(new CylinderGeometry(0.16, 0.2, 5.2, 8), matPoste);
+    poste.position.y = 2.6;
+    s.add(poste);
+    const caixa = new Mesh(new BoxGeometry(0.9, 2.5, 0.7), matPoste);
+    caixa.position.y = 6.2;
+    s.add(caixa);
+    for (let i = 0; i < 3; i++) {
+      const olho = new Mesh(new SphereGeometry(0.3, 10, 8), new MeshStandardMaterial({
+        color: new Color(CORES_SEMAFORO[i]), emissive: new Color(CORES_SEMAFORO[i]),
+        emissiveIntensity: i === aceso ? 3 : 0.12, roughness: 1,
+      }));
+      olho.position.set(0, 7.05 - i * 0.85, 0.4);
+      s.add(olho);
+    }
+    g.add(s);
+  }
+
   /* A fonte do Eros, numa ilha à frente da fachada — na foto ela fica solta no
-     meio do cruzamento, não encostada no prédio. */
+     meio do cruzamento, não encostada no prédio. O meio-fio de pedra escura em
+     volta é o que a separa do asfalto; sem ele a ilha era um disco branco
+     boiando. */
   const fonte = new Group();
   fonte.position.set(23, 0.15, -16);
   g.add(fonte);
-  const ilha = new Mesh(new CylinderGeometry(7.5, 7.8, 0.35, 20), matPedra);
+  const meioFio = new Mesh(new CylinderGeometry(8.4, 8.6, 0.5, 22), matPedraFria);
+  meioFio.position.y = 0.1;
+  meioFio.receiveShadow = true;
+  fonte.add(meioFio);
+  const ilha = new Mesh(new CylinderGeometry(7.5, 7.8, 0.5, 20), matCalcada);
+  ilha.position.y = 0.22;
   ilha.receiveShadow = true;
   fonte.add(ilha);
+
+  /* O Memorial de Shaftesbury. Duas tentativas erradas antes desta e as duas
+     pelo mesmo motivo: cor uniforme não faz silhueta.
+       - Toda em pedra clara, com degraus de cinco metros: um bolo de casamento.
+       - Toda em bronze, com a bacia larga e a estátua dobrada de tamanho: um
+         cipreste verde plantado no meio da praça.
+     O de verdade é PEDRA embaixo e bronze só no alto, e é a diferença entre os
+     dois que desenha. Os degraus alternam de tom para o degrau existir; as
+     alturas somam os 8 m reais, com a estátua ocupando os últimos dois. */
+  const matBronze = new MeshStandardMaterial({
+    color: new Color('#6f9182'), roughness: 0.45, metalness: 0.6,
+  });
+  const matBronzeFundo = new MeshStandardMaterial({
+    color: new Color('#48645a'), roughness: 0.5, metalness: 0.6,
+  });
   for (let i = 0; i < 3; i++) {
-    const deg = new Mesh(new CylinderGeometry(4.6 - i * 1.1, 5 - i * 1.1, 0.42, 18), matPedra);
-    deg.position.y = 0.38 + i * 0.42;
+    const deg = new Mesh(new CylinderGeometry(4.2 - i * 0.85, 4.4 - i * 0.85, 0.46, 18),
+      i % 2 ? matPedraFria : matPedra);
+    deg.position.y = 0.6 + i * 0.46;
+    deg.receiveShadow = true;
     fonte.add(deg);
   }
-  const taca = new Mesh(new CylinderGeometry(2.2, 1, 1.4, 16), matPedra);
-  taca.position.y = 2.3;
-  fonte.add(taca);
-  const pedestal = new Mesh(new CylinderGeometry(0.7, 1.1, 3.6, 12), matPedra);
-  pedestal.position.y = 4.4;
-  fonte.add(pedestal);
-  const matBronze = new MeshStandardMaterial({
-    color: new Color('#8fa89b'), roughness: 0.4, metalness: 0.7,
-  });
-  const eros = new Mesh(new CapsuleGeometry(0.45, 1.2, 5, 12), matBronze);
-  eros.position.y = 7;
+  // bacia de pedra, com o aro de bronze em cima
+  const bacia = new Mesh(new CylinderGeometry(2.6, 1.7, 1.2, 20), matPedraFria);
+  bacia.position.y = 2.5;
+  fonte.add(bacia);
+  const aro = new Mesh(new CylinderGeometry(2.8, 2.8, 0.32, 20), matBronzeFundo);
+  aro.position.y = 3.14;
+  fonte.add(aro);
+  // pilar oitavado de pedra
+  const pilar = new Mesh(new CylinderGeometry(0.62, 0.95, 3.4, 8), matPedra);
+  pilar.position.y = 5;
+  fonte.add(pilar);
+  const capitel = new Mesh(new CylinderGeometry(1.05, 0.72, 0.55, 8), matBronzeFundo);
+  capitel.position.y = 6.95;
+  fonte.add(capitel);
+  // o Anteros, em bronze: a única coisa verde da fonte, e por isso lê
+  const eros = new Mesh(new CapsuleGeometry(0.38, 1.15, 5, 12), matBronze);
+  eros.position.y = 8.1;
+  eros.rotation.z = 0.16;
   eros.castShadow = true;
   fonte.add(eros);
+  const cabeca = new Mesh(new SphereGeometry(0.33, 12, 10), matBronze);
+  cabeca.position.set(0.14, 9.05, 0);
+  fonte.add(cabeca);
   for (const lado of [-1, 1]) {
-    const asa = new Mesh(new BoxGeometry(0.16, 2.2, 1), matBronze);
-    asa.position.set(lado * 0.45, 7.7, -0.3);
-    asa.rotation.z = lado * 0.35;
+    const asa = new Mesh(new BoxGeometry(0.16, 2.1, 0.9), matBronzeFundo);
+    asa.position.set(lado * 0.42, 8.9, -0.35);
+    asa.rotation.z = lado * 0.4;
+    asa.castShadow = true;
     fonte.add(asa);
   }
 
-  /* Ônibus atravessando o cruzamento e gente na calçada, reaproveitando o que
-     já existe em obstaculos.js. Sem isto a praça fica um pátio vazio, que era
-     a outra metade do problema. */
+  /* Ônibus atravessando o cruzamento, táxis pretos e gente na calçada,
+     reaproveitando o que já existe. Sem isto a praça fica um pátio vazio, que
+     era a outra metade do problema.
+
+     A gente fica NA CALÇADA e nas bordas da ilha, não espalhada em círculo
+     pelo asfalto: com o sorteio antigo metade dos pedestres nascia no meio da
+     pista, parada, e a praça parecia um congestionamento de gente. */
   const r = sorteio(fase.semente + 909);
-  for (const [bx, bz, giro] of [[18, 20, 1.35], [30, -6, -0.5], [44, 12, 2.5]]) {
+  // nenhum ônibus encostado na ilha: o de (30,-6) ficava atrás do Eros e virava
+  // uma tarja vermelha de quinze metros colada na fonte
+  for (const [bx, bz, giro] of [[16, 24, 1.35], [38, -4, -0.5], [50, 16, 2.5], [60, -26, 0.9]]) {
     const bus = CONSTRUTORES.onibus().objeto;
     bus.position.set(bx, 0, bz);
     bus.rotation.y = giro;
     g.add(bus);
   }
-  for (let i = 0; i < 16; i++) {
+  for (const [cx2, cz2, giro, cor] of [
+    [12, -2, 0.06, '#191a1f'], [26, -34, 3.2, '#191a1f'],
+    [50, 30, 2.2, '#2b3a4a'], [62, -4, 1.6, '#191a1f'],
+  ]) {
+    const cab = fazCarrinho(cor);
+    cab.position.set(cx2, 0, cz2);
+    cab.rotation.y = giro;
+    g.add(cab);
+  }
+  /* Gente em pé nas calçadas dos quarteirões, na frente do paredão e ao longo
+     do meio-fio da rua dela — um ponto por calçada, com jitter em volta. O
+     sorteio antigo era um círculo em torno do centro da praça, e o centro da
+     praça é o asfalto: metade das pessoas nascia parada no meio da pista. */
+  const CALCADAS = [
+    [48.7, 33.6], [60.5, 13.2], [59.2, -11.4], [47.7, -33.1], [16.9, 46.5],
+    [20.8, 24.7], [20.8, 24.7], [7.4, -12], [7.4, 18], [7.4, 40],
+  ];
+  for (let i = 0; i < 20; i++) {
     const ped = CONSTRUTORES.pedestre(r).objeto;
-    const a = r.entre(0, TAU);
-    ped.position.set(24 + Math.cos(a) * r.entre(9, 24), 0.16, Math.sin(a) * r.entre(9, 30));
+    if (i % 4 === 0) {
+      // encostados na balaustrada da ilha do Eros, olhando os telões
+      const a = r.entre(0, TAU);
+      ped.position.set(23 + Math.cos(a) * r.entre(8.2, 9.4), 0.4, -16 + Math.sin(a) * r.entre(8.2, 9.4));
+    } else {
+      const c = CALCADAS[i % CALCADAS.length];
+      ped.position.set(c[0] + r.entre(-3.5, 3.5), 0.3, c[1] + r.entre(-4, 4));
+    }
     ped.rotation.y = r.entre(0, TAU);
     g.add(ped);
   }
