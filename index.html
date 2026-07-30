@@ -3229,20 +3229,32 @@ function fazCarrinho(cor) {
   return g;
 }
 
+/* Materiais de árvore guardados por cor. Cada quarteirão é remontado ao ser
+   reciclado, e o parque passou a ter três vezes mais árvores — sem este cache
+   era um material novo por tronco e por copa, centenas deles nascendo e
+   morrendo enquanto ela corre. */
+const MAT_ARVORE = new Map();
+function matArvore(cor, aspereza = 0.9) {
+  let m = MAT_ARVORE.get(cor);
+  if (!m) {
+    m = new MeshStandardMaterial({ color: new Color(cor), roughness: aspereza });
+    MAT_ARVORE.set(cor, m);
+  }
+  return m;
+}
+
 function fazArvore(r, cores) {
   const g = new Group();
   const alturaTronco = r.entre(2.2, 3.4);
   const tronco = new Mesh(
     new CylinderGeometry(0.18, 0.32, alturaTronco, 8),
-    new MeshStandardMaterial({ color: new Color('#7d5c3c'), roughness: 0.9 })
+    matArvore('#7d5c3c')
   );
   tronco.position.y = alturaTronco / 2;
   tronco.castShadow = true;
   g.add(tronco);
 
-  const matCopa = new MeshStandardMaterial({
-    color: new Color(cores[Math.floor(r() * cores.length)]), roughness: 0.9,
-  });
+  const matCopa = matArvore(cores[Math.floor(r() * cores.length)]);
   const tufos = r.inteiro(3, 5);
   for (let i = 0; i < tufos; i++) {
     const t = new Mesh(new SphereGeometry(r.entre(1.1, 1.9), 9, 7), matCopa);
@@ -4299,15 +4311,34 @@ function criarMundo(cena, renderer, fase, preset) {
     g.position.z = z0;
 
     if (fase.tipo === 'parque') {
+      /* O parque era uma fileira fina de árvores colada no caminho, de um lado
+         só, e atrás dela grama vazia até o horizonte — dos dois lados. Agora
+         são três faixas: bosque perto do caminho, bosque fundo atrás dele, e
+         uma linha de árvores na margem de lá da água. A do lago fica ALÉM do
+         lago (que vai de x=-58 a x=-11), então ela emoldura a água em vez de
+         tapar a vista, que era o motivo de não haver nada daquele lado. */
       const cores = fase.coresFolhagem;
-      const quantas = Math.round(r.inteiro(4, 7) * preset.arvores);
-      for (let i = 0; i < quantas; i++) {
-        // árvores só no lado sem lago: do outro lado elas fechavam a vista
-        // da água, que é justamente o que se quer ver ali
-        const a = fazArvore(r, cores);
-        a.position.set(r.entre(7, 22), 0, r.entre(0, BLOCO));
-        a.scale.setScalar(r.entre(0.85, 1.3));
-        g.add(a);
+      const faixas = [
+        { de: 7, ate: 25, quantas: [4, 6], escala: [0.85, 1.25] },
+        { de: 26, ate: 58, quantas: [5, 8], escala: [1.0, 1.55] },
+        { de: -96, ate: -62, quantas: [3, 5], escala: [0.95, 1.4] },
+      ];
+      for (const f of faixas) {
+        const quantas = Math.round(r.inteiro(f.quantas[0], f.quantas[1]) * preset.arvores);
+        for (let i = 0; i < quantas; i++) {
+          const a = fazArvore(r, cores);
+          a.position.set(r.entre(f.de, f.ate), 0, r.entre(0, BLOCO));
+          a.scale.setScalar(r.entre(f.escala[0], f.escala[1]));
+          g.add(a);
+        }
+      }
+      // arbustos rentes ao caminho, do lado do lago, para a beirada não ser
+      // uma faixa de grama pelada
+      if (r.chance(0.7)) {
+        const arb = fazArvore(r, cores);
+        arb.position.set(r.entre(-10.4, -9.4), -0.9, r.entre(1, BLOCO - 1));
+        arb.scale.setScalar(r.entre(0.42, 0.62));
+        g.add(arb);
       }
       // bancos do parque e postes baixos, sempre fora das faixas
       if (r.chance(0.6)) {
