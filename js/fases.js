@@ -73,35 +73,64 @@ export const FASES = [
     velocidadeFinal: 14.5,
     cartas: [0, 1, 2, 3],
 
+    /* Manhã de chuva de verdade, com o céu carregado. Antes isto era um branco
+       em que não dava para ver nada, e as duas causas estavam aqui:
+       - `dirSol` apontava para o fim da rua (z=0.86), então o ponto de fuga
+         virava um borrão branco. Agora o sol está de lado e baixo, atrás das
+         nuvens, e o fundo da rua é legível.
+       - `neblinaCeu` a 0.75 lavava três quartos do céu com a cor do horizonte,
+         que era um creme quase branco. Caiu para 0.32, e o horizonte ficou
+         cinza-azulado.
+       Com o céu fechado, as vitrines acesas e o asfalto molhado passam a
+       recortar contra ele — que é o que faz esta ser a Londres chuvosa bonita
+       em vez de uma folha em branco. */
     paleta: {
-      ceuAlto: '#93c2ea', ceuHorizonte: '#e6e2d4', ceuBaixo: '#f1e4cd',
-      corSol: '#fff3d8', dirSol: [0.28, 0.42, 0.86], tamanhoSol: 90,
-      forcaSol: 1.1, neblinaCeu: 0.75,
+      ceuAlto: '#5c7796', ceuHorizonte: '#9aa6ae', ceuBaixo: '#b3b6b2',
+      corSol: '#e8e4d8', dirSol: [0.86, 0.24, -0.22], tamanhoSol: 130,
+      forcaSol: 0.45, neblinaCeu: 0.32,
     },
-    neblina: 0.0031,
-    forcaHalo: 0,
-    dirLuz: [0.32, 0.7, 0.64],
-    corSol: '#fff0d4', forcaLuzSol: 1.9,
-    corCeuLuz: '#cfe2f2', corChaoLuz: '#cdbfa8', forcaHemisferio: 1.5,
-    corPoste: '#ffc98a', forcaPoste: 9,
-    sombra: 0.6,
+    neblina: 0.0034,
+    forcaHalo: 0.018,
+    dirLuz: [0.72, 0.6, -0.18],
+    corSol: '#dfe6ee', forcaLuzSol: 1.15,
+    corCeuLuz: '#93a8bf', corChaoLuz: '#8d8577', forcaHemisferio: 1.15,
+    corPoste: '#ffc98a', forcaPoste: 16,
+    sombra: 0.35,
 
-    chuva: 0.4, corChuva: '#cfe2f4', vento: [-1.2, 0],
-    molhado: 0.55, pedra: false,
+    chuva: 0.75, corChuva: '#d6e4f2', vento: [-1.2, 0],
+    molhado: 0.9, pedra: false,
 
     coresPredio: ['#f2d3d6', '#cfe4dc', '#f7e7c9', '#f6dfa6', '#dee2f1', '#f4cdb9'],
-    janelasAcesas: 0.16, corJanela: '#ffe6b8', forcaJanela: 0.9,
+    janelasAcesas: 0.62, corJanela: '#ffdd9a', forcaJanela: 2.6,
     lojas: true, coresLoja: ['#c02a3e', '#2f7a68', '#3f5a9c', '#8a5aa8', '#d08a2a'],
     coresPorta: ['#2f5a8c', '#1f6b52', '#8e2436', '#3c3160', '#c07a1e', '#1d1b22'],
 
-    // Westminster mudou para a cena da noite, onde a torre pode ser iluminada
-    // de verdade. Aqui ficou só a fileira pastel contínua, que já é bonita.
-    pontos: [],
+    /* Westminster mudou para a cena da noite, onde a torre pode ser iluminada
+       de verdade. No lugar dela, o Piccadilly Circus — porque 900 m de fileira
+       pastel sem nada acontecendo é muito tempo correndo por nada, que foi
+       exatamente a queixa do Daniel.
+
+       Fica no meio do percurso, com os telões virados para quem vem pela rua.
+       A janela de olhada segue a mesma conta do Big Ben: no auge (dist ≈ 400)
+       o paredão está a 66 m e ocupa boa parte da tela, com a menina ainda
+       dentro do quadro. */
+    pontos: [
+      { tipo: 'piccadilly', x: 0, z: 466, claro: 190, lado: 1,
+        legenda: 'Piccadilly Circus. A cidade acordando com as luzes ainda acesas.',
+        aviso: 150,
+        /* fov 46, mais FECHADO que os 54 de base: aqui o marco é largo e baixo,
+           não uma torre de 100 m, então o que ele precisa é de aproximação e
+           não de espaço vertical. Abrir para 66 tinha afastado tudo. */
+        olhada: { de: 320, ate: 450, fov: 46, recuo: 15, subida: 1.6,
+                  mira: [26, 14, 466], dofPerto: 120, dofLonge: 480 } },
+    ],
 
     padroes: PADROES_RUA,
-    camera: { exposicao: 0.94, bloom: 0.5, vinheta: 0.3, grao: 0.004, gotas: 0.5, aberracao: 0,
+    // bloom mais forte: é ele que faz as vitrines e os telões sangrarem no
+    // cinza da chuva. E o véu quente sai, que ali só empapava o branco.
+    camera: { exposicao: 1.0, bloom: 0.8, vinheta: 0.32, grao: 0.005, gotas: 0.7, aberracao: 0,
                dof: 0.78, dofPerto: 32, dofLonge: 270,
-               contraste: 0.24, saturacao: 1.2, veu: 0.1 },
+               contraste: 0.3, saturacao: 1.14, veu: 0.04 },
     som: { chuva: 1, vento: 0.5, acorde: [130.81, 196, 246.94] },
   },
 

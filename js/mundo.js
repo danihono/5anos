@@ -12,12 +12,16 @@
 
 import { Group, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, BoxGeometry, PlaneGeometry,
          CylinderGeometry, SphereGeometry, ConeGeometry, TorusGeometry, CircleGeometry,
+         CapsuleGeometry,
          DirectionalLight, HemisphereLight, PointLight, SpotLight, Color, DoubleSide, FogExp2,
          BufferGeometry, Float32BufferAttribute, ShaderMaterial, LineSegments, AdditiveBlending,
          NormalBlending,
          Vector3 } from 'three';
 import { TAU, mistura, sorteio } from './util.js';
 import * as Mat from './materiais.js';
+// o ônibus vermelho de dois andares e o pedestre já existem como obstáculos;
+// aqui eles entram parados na calçada, só de enfeite, para a rua ter gente
+import { CONSTRUTORES } from './obstaculos.js';
 
 export const BLOCO = 24;
 export const LARGURA_FAIXA = 2;
@@ -590,7 +594,7 @@ function fazPisoDaClareira(p, fase) {
   return g;
 }
 
-function criarPontos(fase, alvo, preset) {
+function criarPontos(fase, alvo, preset, telas = []) {
   const lista = [];
   for (const p of (fase.pontos || [])) {
     let obj = null;
@@ -598,7 +602,9 @@ function criarPontos(fase, alvo, preset) {
     else if (p.tipo === 'parlamento') obj = fazParlamento({ noturno: p.noturno });
     else if (p.tipo === 'roda') obj = fazRodaGigante();
     else if (p.tipo === 'ponte') obj = fazTowerBridge();
+    else if (p.tipo === 'piccadilly') obj = fazPiccadilly(fase);
     if (!obj) continue;
+    if (obj.userData.painel) telas.push(...obj.userData.painel);
 
     obj.position.set(p.x || 0, p.y || 0, p.z);
     if (p.rot) obj.rotation.y = p.rot;
@@ -1124,6 +1130,111 @@ function fazRodaGigante() {
  *
  * Cor de pedra clara e azul de aço, como a ponte é pintada desde 1977.
  */
+/**
+ * Piccadilly Circus. O que faz alguém reconhecer o lugar é uma coisa só: o
+ * paredão curvo de telões acesos na esquina. Tudo o mais aqui é moldura para
+ * ele — o prédio que o segura, a fonte do Eros embaixo, os ônibus vermelhos.
+ *
+ * Os painéis são blocos de cor grandes e chapados, de propósito. A lição que
+ * já custou caro duas vezes nesta cena (a treliça do relógio do Big Ben, o aro
+ * da London Eye): a 100 m, detalhe mais fino que um pixel não desenha, só
+ * acinzenta. Telão de verdade tem imagem; este tem faixas de cor enormes, que
+ * é o que sobrevive à distância e ainda lê como "telão".
+ */
+function fazPiccadilly(fase) {
+  const g = new Group();
+  const matPedra = new MeshStandardMaterial({ color: new Color('#c9bfae'), roughness: 0.9 });
+  const matEscuro = new MeshStandardMaterial({ color: new Color('#2b2a30'), roughness: 0.8 });
+
+  // chão da praça — começa na borda da calçada (x=9) e não atravessa a rua
+  const chao = new Mesh(new PlaneGeometry(64, 130),
+    materialChao(Mat.calcada(fase.molhado, fase.semente + 77), [16, 32], '#8f9298'));
+  chao.rotation.x = -Math.PI / 2;
+  chao.position.set(41, 0.16, 0);
+  chao.receiveShadow = true;
+  g.add(chao);
+
+  /* O paredão de telões. Um arco de verdade virava metade dos painéis de
+     costas para quem vem pela rua — o primeiro desenho tinha 1,5 rad de
+     abertura e só um painel aparecia. Aqui eles ficam quase todos de frente
+     para ela, com um leque de meio radiano só para dar a curva da esquina. */
+  const CORES = ['#ff2f6d', '#22d3ee', '#ffd23f', '#7c5cff', '#ff7a1a', '#2fe08a'];
+  const painel = [];
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const pz = -26 + t * 52;
+    const px = 21 + Math.abs(t - 0.5) * 11;      // curva rasa, bojo para a rua
+    const a = (t - 0.5) * 0.5 - Math.PI / 2;     // usado só para virar o painel
+
+    // a fachada atrás do painel — escura e mais baixa, para o telão ser o herói
+    const parede = new Mesh(new BoxGeometry(9, 22, 5), matEscuro);
+    parede.position.set(px, 11, pz);
+    parede.rotation.y = -a + Math.PI / 2;
+    parede.castShadow = true;
+    g.add(parede);
+
+    /* O telão vai no +z LOCAL da parede. Rodada de ~180°, é essa a face que
+       olha para quem vem pela rua — na primeira tentativa eu pus em -z e os
+       sete telões ficaram todos escondidos atrás das próprias paredes. */
+    const tela = new Group();
+    tela.position.set(px, 13, pz);
+    tela.rotation.y = -a + Math.PI / 2;
+    g.add(tela);
+    const moldura = new Mesh(new BoxGeometry(8.6, 14, 0.5), matEscuro);
+    moldura.position.z = 2.6;
+    tela.add(moldura);
+    for (let f = 0; f < 3; f++) {
+      const cor = CORES[(i * 2 + f) % CORES.length];
+      const faixa = new Mesh(new BoxGeometry(7.8, 4, 0.3), new MeshStandardMaterial({
+        color: new Color(cor), emissive: new Color(cor), emissiveIntensity: 2.6, roughness: 1,
+      }));
+      faixa.position.set(0, 4.4 - f * 4.4, 2.95);
+      tela.add(faixa);
+      painel.push(faixa);
+    }
+    // a luz que o telão joga na praça — é o que prova que ele está aceso
+    if (i % 3 === 1) {
+      const brilho = new PointLight(new Color(CORES[i % CORES.length]), 90, 40, 1.7);
+      brilho.position.set(px - 3, 12, pz - 3);
+      g.add(brilho);
+    }
+  }
+
+  /* A fonte do Eros, embaixo dos telões. Degraus, taça e a figura alada. */
+  const fonte = new Group();
+  fonte.position.set(26, 0.16, -14);
+  g.add(fonte);
+  for (let i = 0; i < 3; i++) {
+    const deg = new Mesh(new CylinderGeometry(5.4 - i * 1.1, 5.8 - i * 1.1, 0.45, 18), matPedra);
+    deg.position.y = 0.22 + i * 0.45;
+    deg.receiveShadow = true;
+    fonte.add(deg);
+  }
+  const taca = new Mesh(new CylinderGeometry(2.5, 1.1, 1.5, 16), matPedra);
+  taca.position.y = 2.3;
+  fonte.add(taca);
+  const pedestal = new Mesh(new CylinderGeometry(0.8, 1.2, 4, 12), matPedra);
+  pedestal.position.y = 4.6;
+  fonte.add(pedestal);
+  const matBronze = new MeshStandardMaterial({
+    color: new Color('#8fa89b'), roughness: 0.4, metalness: 0.7,
+  });
+  const eros = new Mesh(new CapsuleGeometry(0.5, 1.3, 5, 12), matBronze);
+  eros.position.y = 7.6;
+  eros.castShadow = true;
+  fonte.add(eros);
+  for (const lado of [-1, 1]) {
+    const asa = new Mesh(new BoxGeometry(0.18, 2.4, 1.1), matBronze);
+    asa.position.set(lado * 0.5, 8.4, -0.3);
+    asa.rotation.z = lado * 0.35;
+    fonte.add(asa);
+  }
+
+  // as faixas ficam guardadas no grupo: quem anima é o laço do mundo
+  g.userData.painel = painel;
+  return g;
+}
+
 function fazTowerBridge() {
   const g = new Group();
   const PEDRA = '#e0d6bd';
@@ -1652,9 +1763,34 @@ export function criarMundo(cena, renderer, fase, preset) {
         }
       }
 
+      /* Gente na calçada e um ônibus parado. A rua tinha 900 m com uma cabine
+         telefônica a cada dois quarteirões e mais nada — "só um branco que
+         você corre por muito tempo", nas palavras do Daniel. Nada disto entra
+         nas faixas: é tudo cenário, encostado na parede ou no meio-fio. */
+      const quantosPed = r.inteiro(2, 4);
+      for (let i = 0; i < quantosPed; i++) {
+        const lado = r.chance(0.5) ? -1 : 1;
+        const zl = r.entre(1, BLOCO - 1);
+        if (naClareira(z0 + zl, lado, 1)) continue;
+        const ped = CONSTRUTORES.pedestre(r).objeto;
+        ped.position.set(lado * r.entre(6.2, 8.4), 0.16, zl);
+        ped.rotation.y = r.entre(0, TAU);
+        g.add(ped);
+      }
+      if (r.chance(0.3)) {
+        const lado = r.chance(0.5) ? -1 : 1;
+        const zl = r.entre(3, BLOCO - 8);
+        if (!naClareira(z0 + zl, lado, 6)) {
+          const bus = CONSTRUTORES.onibus().objeto;
+          bus.position.set(lado * 4.2, 0, zl);
+          bus.rotation.y = lado > 0 ? 0 : Math.PI;
+          g.add(bus);
+        }
+      }
+
       // carrinhos estacionados: dão cor e escala à rua sem entrar nas faixas
       const CORES_CARRO = ['#c02a3e', '#4f7fb8', '#e0b24a', '#5d9e86', '#d98a68', '#f0f0e8'];
-      const quantosCarros = r.inteiro(1, 2);
+      const quantosCarros = r.inteiro(2, 3);
       for (let i = 0; i < quantosCarros; i++) {
         const lado = r.chance(0.5) ? -1 : 1;
         const cor = CORES_CARRO[r.inteiro(0, CORES_CARRO.length - 1)];
@@ -1690,7 +1826,8 @@ export function criarMundo(cena, renderer, fase, preset) {
   /* marcos parados no trajeto, pelos quais ela realmente passa */
   const pontosGrupo = new Group();
   grupo.add(pontosGrupo);
-  const pontos = criarPontos(fase, pontosGrupo, preset);
+  const telas = [];
+  const pontos = criarPontos(fase, pontosGrupo, preset, telas);
 
   /* marcos distantes, de pano de fundo */
   const marcos = new Group();
@@ -1724,6 +1861,14 @@ export function criarMundo(cena, renderer, fase, preset) {
 
   function atualizar(dt, zJogador, camPos) {
     tempo += dt;
+
+    /* Os telões do Piccadilly piscam devagar, cada faixa no seu ritmo. É só a
+       intensidade que varia — trocar a cor a cada quadro dava um estrobo, e o
+       que se quer é a sensação de imagem mudando, não uma discoteca. */
+    for (let i = 0; i < telas.length; i++) {
+      const m = telas[i].material;
+      m.emissiveIntensity = 2.1 + Math.sin(tempo * (0.7 + (i % 5) * 0.23) + i) * 0.9;
+    }
 
     // recicla os blocos que ficaram para trás
     const primeiroVisivel = Math.floor((zJogador - BLOCO) / BLOCO);
