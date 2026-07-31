@@ -2225,7 +2225,7 @@ function criarMenina(aparencia = APARENCIA) {
     // aparecer uma faixa creme de blusa descendo pela nuca, que lia como uma
     // risca careca
     { rCima: 0.204, rBaixo: 0.212, h: 0.26, de: -0.19, dz: -0.03, vaoTras: 0 },
-    { rCima: 0.212, rBaixo: 0.2, h: 0.28, de: -0.26, dz: -0.02, vaoTras: 0.62 },
+    { rCima: 0.212, rBaixo: 0.2, h: 0.22, de: -0.26, dz: -0.02, vaoTras: 0.62 },
   ];
   for (let i = 0; i < TRECHOS.length; i++) {
     const t = TRECHOS[i];
@@ -2239,32 +2239,26 @@ function criarMenina(aparencia = APARENCIA) {
     pai = seg;
   }
 
-  /* A barra.
+  /* A barra, e o fim de uma discussão que já custou três versões.
 
-     Duas tentativas de "pontas soltas" e as duas viraram dentadura: cilindros
-     pendurados na borda leem como uma fileira de dentes se ficam separados, e
-     como garras se ficam grossos o bastante para se tocar. A imagem dele não
-     tem isso — tem uma barra quase reta, com um degrau e uma mecha mais
-     comprida de um lado. Então: um trecho curto e mais estreito fecha a coluna,
-     e duas mechas finas descem mais um pouco. Duas, não nove. */
+     Eu tentei três vezes terminar o cabelo com cilindros soltos pendurados na
+     borda. Separados, leem como dentadura; grossos o bastante para se tocar,
+     leem como garras; e finos e compridos, que foi a última tentativa, o
+     Daniel viu e disse na hora: "muito longo com tranças, não sei por quê".
+
+     Ele tem razão e a imagem dele confirma: aquele cabelo acaba num CORTE, com
+     um degrau e nada mais. Então é só um trecho curto e mais estreito fechando
+     a coluna. Nenhuma mecha solta. */
   const remate = new Group();
-  remate.position.y = -0.28;
+  remate.position.y = -0.22;
   pai.add(remate);
-  /* Afina pouco (0.20 → 0.188): afinando muito, a coluna arredondava a ponta e
-     a silhueta virava cápsula, quando na imagem dele ela é um retângulo de topo
-     redondo, com os lados descendo quase verticais até a barra.
-
-     E o vão de trás abre de vez aqui: na imagem, as duas mechas laterais
-     continuam DESCENDO ao lado da mochila até o fundo dela, e é isso que
-     emoldura a peça em vez de escondê-la. */
-  for (const geo of arcosDeCabelo(0.2, 0.188, 0.17, VAO_ROSTO, 1.45)) {
-    malha(geo, matCabelo, remate, 0, -0.085, 0).scale.z = 0.86;
+  // afina pouco (0.20 → 0.188): afinando muito, a coluna arredonda a ponta e a
+  // silhueta vira cápsula, quando na imagem dele ela é um retângulo de topo
+  // redondo com os lados descendo quase verticais até a barra
+  for (const geo of arcosDeCabelo(0.2, 0.188, 0.1, VAO_ROSTO, 1.45)) {
+    malha(geo, matCabelo, remate, 0, -0.05, 0).scale.z = 0.86;
   }
   cabelo.push({ g: remate, nivel: 3 });
-  for (const [ang, comp] of [[2.3, 0.22], [-2.3, 0.15], [1.75, 0.12], [-1.75, 0.17]]) {
-    malha(tubo(0.062, 0.036, comp, 5), matCabelo, remate,
-      Math.sin(ang) * 0.172, -0.16 - comp / 2, Math.cos(ang) * 0.172 * 0.86);
-  }
 
   // o nome antigo, que a animação usa para abrir a barra da saia na velocidade
   const corpoCasaco = saia;
@@ -2330,14 +2324,21 @@ function criarMenina(aparencia = APARENCIA) {
            variação deve escalar com a velocidade. */
       bracoE.g.rotation.x = -s * 0.62 * amp;
       bracoD.g.rotation.x = s * 0.62 * amp;
-      bracoE.cotovelo.rotation.x = 1.25 + s * 0.3 * amp;
-      bracoD.cotovelo.rotation.x = 1.25 - s * 0.3 * amp;
-      /* Abertura lateral maior que antes (0.20 contra 0.13): é ela que joga a
-         manga para FORA do sino de cabelo. Com o cabelo estreito de antes o
-         braço aparecia sozinho; agora, se ele não abrir, só a mão escapa e ela
-         fica com duas bolinhas creme no lugar dos braços. */
-      bracoE.g.rotation.z = 0.2;
-      bracoD.g.rotation.z = -0.2;
+      /* E o cotovelo dobrava para TRÁS. Com +1.25 o antebraço aponta para -z,
+         que é atrás dela; de costas, as duas mãos apareciam por cima da
+         mochila. Quem corre leva o antebraço para a frente.
+
+         0.95 e não 1.15: somando com o ombro à frente (0.62), a 1.15 o braço
+         esticava na horizontal e ela parecia estar pedindo carona. */
+      bracoE.cotovelo.rotation.x = -0.95 - s * 0.26 * amp;
+      bracoD.cotovelo.rotation.x = -0.95 + s * 0.26 * amp;
+      /* O SINAL estava trocado, e estava desde sempre. O braço esquerdo fica em
+         x = -0.195; girar +Z leva a ponta dele para +x, ou seja para DENTRO do
+         corpo. Com 0.13 dava para não reparar; quando eu subi para 0.20 para
+         "abrir" a manga, na verdade enfiei as duas mãos por cima da mochila.
+         Negativo à esquerda e positivo à direita é que abre. */
+      bracoE.g.rotation.z = -0.12;
+      bracoD.g.rotation.z = 0.12;
       // o antebraço chega um pouco atrasado, senão o gesto fica de robô
       bracoE.cotovelo.rotation.y = -c * 0.12 * amp;
       bracoD.cotovelo.rotation.y = c * 0.12 * amp;
@@ -2365,8 +2366,8 @@ function criarMenina(aparencia = APARENCIA) {
       pernaD.joelho.rotation.x = mistura(pernaD.joelho.rotation.x, 0.5, 0.2);
       bracoE.g.rotation.x = mistura(bracoE.g.rotation.x, -1.5, 0.16);
       bracoD.g.rotation.x = mistura(bracoD.g.rotation.x, -1.5, 0.16);
-      bracoE.cotovelo.rotation.x = mistura(bracoE.cotovelo.rotation.x, 0.5, 0.16);
-      bracoD.cotovelo.rotation.x = mistura(bracoD.cotovelo.rotation.x, 0.5, 0.16);
+      bracoE.cotovelo.rotation.x = mistura(bracoE.cotovelo.rotation.x, -0.5, 0.16);
+      bracoD.cotovelo.rotation.x = mistura(bracoD.cotovelo.rotation.x, -0.5, 0.16);
       balanco.position.y = mistura(balanco.position.y, 0, 0.2);
       // no ar o corpo para de torcer, senão a contra-rotação fica travada
       quadril.rotation.y = mistura(quadril.rotation.y, 0, 0.2);
@@ -2386,9 +2387,11 @@ function criarMenina(aparencia = APARENCIA) {
     // tropeço: ela cambaleia mas não cai — o jogo nunca trava
     balanco.rotation.z = inclinacaoLateral + Math.sin(fase * 3) * tropecoSuave * 0.16;
     balanco.rotation.x = tropecoSuave * 0.22;
+    // tropeçando, os braços abrem de vez — mesmo sinal do resto: fora é
+    // negativo à esquerda e positivo à direita
     if (tropecoSuave > 0.01) {
-      bracoE.g.rotation.z = 0.1 - tropecoSuave * 0.9;
-      bracoD.g.rotation.z = -0.1 + tropecoSuave * 0.9;
+      bracoE.g.rotation.z = -0.1 - tropecoSuave * 0.9;
+      bracoD.g.rotation.z = 0.1 + tropecoSuave * 0.9;
     }
 
     /* O cabelo, com atraso: cada trecho persegue o de cima.
