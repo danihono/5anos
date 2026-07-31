@@ -990,6 +990,45 @@ export function iniciar() {
       p.textContent = 'Você já chegou até a porta uma vez. Pode correr de novo, ou ir direto para as cartas — elas continuam lá.';
     }
 
+    /* A abertura em duas telas: primeiro a cartela, depois as orientações.
+       A cartela passa sozinha em 2,6 s, mas QUALQUER toque, clique ou tecla
+       adianta — cartão que prende quem está esperando não é abertura, é
+       pedágio. `passar` é idempotente, então tanto faz quem chegar primeiro. */
+    const elCartela = $('#intro-cartela');
+    const elGuia = $('#intro-guia');
+    let cartelaPassou = false;
+    function passarCartela() {
+      if (cartelaPassou) return;
+      cartelaPassou = true;
+      clearTimeout(relogioCartela);
+      removeEventListener('pointerdown', passarCartela);
+      removeEventListener('keydown', passarCartela);
+      elCartela.hidden = true;
+      elGuia.hidden = false;
+    }
+    /* A contagem só começa depois de a cartela ter sido PINTADA.
+
+       Armando o relógio na hora, os 2,6 s correm junto com o primeiro quadro do
+       jogo — e esse quadro segura a thread por mais de dois segundos na estreia,
+       que é quando os shaders compilam. Medido: a cartela ficava 2,6 s de
+       relógio e 300 ms de tela. Dois `requestAnimationFrame` garantem uma
+       pintura antes de a contagem começar.
+
+       E os 600 ms de rede de segurança existem porque a espera pela pintura não
+       pode ser infinita: numa máquina bem lenta o primeiro quadro leva sete
+       segundos, e aí a abertura viraria uma sala de espera. */
+    let relogioCartela = setTimeout(iniciarContagem, 600);
+    let contando = false;
+    function iniciarContagem() {
+      if (contando || cartelaPassou) return;
+      contando = true;
+      clearTimeout(relogioCartela);
+      relogioCartela = setTimeout(passarCartela, 2600);
+    }
+    requestAnimationFrame(() => requestAnimationFrame(iniciarContagem));
+    addEventListener('pointerdown', passarCartela);
+    addEventListener('keydown', passarCartela);
+
     // gancho de inspeção, só com #debug na URL: permite medir posições e
     // caixas envolventes de dentro do navegador sem poluir o escopo global
     if (document.body.classList.contains('debug')) {
