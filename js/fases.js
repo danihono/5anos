@@ -223,6 +223,16 @@ export const FASES = [
     janelasAcesas: 0, lojas: false,
 
     pontos: [
+      /* O coreto, logo na entrada. A cena abria com oitocentos metros de
+         alameda reta até a roda-gigante, e mesmo com o parque cheio isso é
+         muito tempo sem nada para onde olhar. Ele fica do lado das árvores
+         (x positivo é a ESQUERDA da tela) e perto do caminho, a 14 m, para
+         passar grande sem precisar de janela de câmera própria. */
+      { tipo: 'coreto', x: 14, z: 118, escala: 1,
+        nome: 'O coreto',
+        legenda: 'Alguém tocava aqui nos domingos. Hoje é só o vento.',
+        aviso: 55 },
+
       /* A London Eye em balanço sobre o lago, com o pé na margem de lá (a água
          vai de x=-58 a x=-11). Antes ela era menor e ficava a x=-40: a menina
          passava quase por baixo e a roda saía cortada pela quina de cima da

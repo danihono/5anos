@@ -485,6 +485,10 @@ function fazCarrinho(cor) {
    era um material novo por tronco e por copa, centenas deles nascendo e
    morrendo enquanto ela corre. */
 const MAT_ARVORE = new Map();
+/* As flores dos canteiros. Poucas cores e saturadas: a graça é o ponto de cor
+   contra o verde, e meia dúzia de tons pastel viraria mais grama. */
+const FLORES = ['#d8324b', '#e8842a', '#e6c033', '#c85a9e', '#7a4fd0'];
+const geoFlor = new SphereGeometry(0.13, 6, 4);
 function matArvore(cor, aspereza = 0.9) {
   let m = MAT_ARVORE.get(cor);
   if (!m) {
@@ -605,6 +609,7 @@ function criarPontos(fase, alvo, preset, telas = [], acendiveis = []) {
     else if (p.tipo === 'roda') obj = fazRodaGigante();
     else if (p.tipo === 'ponte') obj = fazTowerBridge();
     else if (p.tipo === 'piccadilly') obj = fazPiccadilly(fase);
+    else if (p.tipo === 'coreto') obj = fazCoreto();
     if (!obj) continue;
     if (obj.userData.painel) telas.push(...obj.userData.painel);
     if (obj.userData.acender) acendiveis.push(obj.userData.acender);
@@ -1063,6 +1068,75 @@ function fazBalaustrada(comprimento, lado) {
  * silhueta nenhuma — some, exatamente como o Big Ben sumia na cena 1. O tom
  * frio lê como "aço branco na sombra" e devolve o desenho da estrutura.
  */
+/**
+ * O coreto do parque, logo na entrada da cena 2.
+ *
+ * Ele existe por um motivo de ritmo: a cena abria com oitocentos metros de
+ * alameda reta até a roda-gigante, e mesmo com o parque cheio isso é muito
+ * tempo sem nada para onde olhar. Um coreto aos cento e poucos metros dá um
+ * primeiro ponto de chegada.
+ *
+ * Oito lados, telhado cônico, base de pedra e guarda-corpo vazado — a forma
+ * clássica dos parques vitorianos, e as oito faces já dão a leitura sem
+ * precisar de detalhe fino.
+ */
+function fazCoreto() {
+  const g = new Group();
+  const LADOS = 8, RAIO = 3.4;
+  const matPedra = new MeshStandardMaterial({ color: new Color('#cfc6b2'), roughness: 0.9 });
+  const matVerde = new MeshStandardMaterial({ color: new Color('#2f5348'), roughness: 0.55, metalness: 0.3 });
+  const matTelha = new MeshStandardMaterial({ color: new Color('#3d6b5c'), roughness: 0.6, metalness: 0.25 });
+  const matPiso = new MeshStandardMaterial({ color: new Color('#b9a98c'), roughness: 0.9 });
+
+  // dois degraus de pedra e o piso
+  const base = new Mesh(new CylinderGeometry(RAIO + 0.7, RAIO + 0.9, 0.3, LADOS), matPedra);
+  base.position.y = 0.15;
+  base.receiveShadow = true;
+  g.add(base);
+  const deg = new Mesh(new CylinderGeometry(RAIO + 0.25, RAIO + 0.45, 0.28, LADOS), matPedra);
+  deg.position.y = 0.42;
+  g.add(deg);
+  const piso = new Mesh(new CylinderGeometry(RAIO, RAIO, 0.16, LADOS), matPiso);
+  piso.position.y = 0.62;
+  piso.receiveShadow = true;
+  g.add(piso);
+
+  // oito colunas, e entre elas o guarda-corpo até a altura do peito
+  for (let i = 0; i < LADOS; i++) {
+    const a = (i / LADOS) * TAU;
+    const col = new Mesh(new CylinderGeometry(0.13, 0.15, 2.9, 7), matVerde);
+    col.position.set(Math.sin(a) * RAIO * 0.92, 2.15, Math.cos(a) * RAIO * 0.92);
+    col.castShadow = true;
+    g.add(col);
+
+    // o vão da frente fica aberto: é por ele que se vê o miolo
+    if (i === 0) continue;
+    const meio = ((i + 0.5) / LADOS) * TAU;
+    const largura = 2 * RAIO * 0.92 * Math.sin(Math.PI / LADOS);
+    const guarda = new Mesh(Mat.caixaArredondada(largura, 0.62, 0.12, 0.04, 2), matVerde);
+    guarda.position.set(Math.sin(meio) * RAIO * 0.9, 1.05, Math.cos(meio) * RAIO * 0.9);
+    guarda.rotation.y = meio;
+    g.add(guarda);
+  }
+
+  // friso, telhado cônico e o pináculo
+  const friso = new Mesh(new CylinderGeometry(RAIO + 0.3, RAIO + 0.3, 0.26, LADOS), matVerde);
+  friso.position.y = 3.68;
+  g.add(friso);
+  const telhado = new Mesh(new ConeGeometry(RAIO + 0.95, 1.9, LADOS), matTelha);
+  telhado.position.y = 4.76;
+  telhado.castShadow = true;
+  g.add(telhado);
+  const ponta = new Mesh(new CylinderGeometry(0.07, 0.13, 0.7, 6), matVerde);
+  ponta.position.y = 6;
+  g.add(ponta);
+  const bola = new Mesh(new SphereGeometry(0.19, 8, 6), matVerde);
+  bola.position.y = 6.42;
+  g.add(bola);
+
+  return g;
+}
+
 function fazRodaGigante() {
   const g = new Group();
   /* O aço ganha um emissivo azul que só acende à noite. A roda de verdade é
@@ -2095,6 +2169,83 @@ export function criarMundo(cena, renderer, fase, preset) {
         b.rotation.y = -Math.PI / 2;
         g.add(b);
       }
+
+      /* ── canteiros de flores ──
+         O parque inteiro é verde, âmbar e cinza: não tinha UMA cor viva. Os
+         canteiros dão isso, e são só uma caixa de terra com meia dúzia de
+         bolinhas em cima — a mesma lógica das copas das árvores, que é o que
+         lê a trinta metros.
+
+         Mais densos nos primeiros 160 m, que é justamente o trecho que o
+         Daniel viu vazio quando o anel de blocos estava perdido. */
+      const perto = z0 < 160 ? 2 : 1;
+      for (let c = 0; c < perto; c++) {
+        if (!r.chance(0.72)) continue;
+        const lado = r.chance(0.62) ? 1 : -1;
+        const cant = new Group();
+        const terra = new Mesh(Mat.caixaArredondada(2.4, 0.22, 1.1, 0.07, 2),
+          matArvore('#5a4433', 0.95));
+        terra.position.y = 0.11;
+        cant.add(terra);
+        const flor = FLORES[Math.floor(r() * FLORES.length)];
+        for (let i = 0; i < 9; i++) {
+          const p = new Mesh(geoFlor, matArvore(r.chance(0.72) ? flor : '#f4efe0', 0.8));
+          p.position.set(r.entre(-1.05, 1.05), r.entre(0.24, 0.34), r.entre(-0.4, 0.4));
+          p.scale.setScalar(r.entre(0.8, 1.3));
+          cant.add(p);
+        }
+        cant.position.set(lado * r.entre(6.4, 8.6), 0, r.entre(2, BLOCO - 2));
+        cant.rotation.y = r.entre(-0.3, 0.3);
+        g.add(cant);
+      }
+
+      /* ── grade de ferro na margem ──
+         Entre o caminho e a água havia uma faixa de grama pelada. A grade é o
+         que os parques de Londres têm ali, e de quebra ela dá uma linha
+         horizontal que ajuda o olho a ler a distância. */
+      const grade = prop('gradeParque', () => {
+        const gg = new Group();
+        const matFerro = matArvore('#2f3b36', 0.5);
+        const trav = new Mesh(new BoxGeometry(0.05, 0.05, BLOCO), matFerro);
+        trav.position.y = 0.62;
+        gg.add(trav);
+        for (let i = 0; i < 17; i++) {
+          const barra = new Mesh(new BoxGeometry(0.045, 0.68, 0.045), matFerro);
+          barra.position.set(0, 0.34, i * (BLOCO / 16));
+          gg.add(barra);
+        }
+        return gg;
+      });
+      grade.position.set(-10.9, 0, 0);
+      g.add(grade);
+
+      // cisnes no lago: dois vultos brancos dizem "parque de Londres" mais
+      // depressa que qualquer outra coisa, e custam três primitivas
+      if (r.chance(0.5)) {
+        const c = prop('cisne', () => {
+          const cg = new Group();
+          const matPena = matArvore('#f2efe6', 0.85);
+          const corpo = new Mesh(new SphereGeometry(0.42, 8, 6), matPena);
+          corpo.scale.set(1, 0.62, 1.5);
+          corpo.position.y = 0.2;
+          cg.add(corpo);
+          const pesc = new Mesh(new CylinderGeometry(0.07, 0.11, 0.62, 6), matPena);
+          pesc.position.set(0, 0.5, 0.34);
+          pesc.rotation.x = 0.26;
+          cg.add(pesc);
+          const cab = new Mesh(new SphereGeometry(0.12, 7, 5), matPena);
+          cab.position.set(0, 0.78, 0.45);
+          cg.add(cab);
+          const bico = new Mesh(new ConeGeometry(0.05, 0.16, 5), matArvore('#c4761f', 0.7));
+          bico.position.set(0, 0.76, 0.58);
+          bico.rotation.x = Math.PI / 2;
+          cg.add(bico);
+          return cg;
+        });
+        c.position.set(r.entre(-38, -15), -0.16, r.entre(2, BLOCO - 2));
+        c.rotation.y = r.entre(0, TAU);
+        g.add(c);
+      }
     } else {
       // cada lado tem seu próprio cursor: as casas ficam encostadas umas nas
       // outras formando a fileira, com larguras diferentes de cada lado.
@@ -2319,11 +2470,26 @@ export function criarMundo(cena, renderer, fase, preset) {
       m.emissiveIntensity = 2.1 + Math.sin(tempo * (0.7 + (i % 5) * 0.23) + i) * 0.9;
     }
 
-    // recicla os blocos que ficaram para trás
-    const primeiroVisivel = Math.floor((zJogador - BLOCO) / BLOCO);
+    /* Recicla os blocos, NOS DOIS SENTIDOS.
+
+       Antes o anel só sabia andar para a frente (`if (indice < primeiro)
+       indice += N`), e isso escondia um bug que custou caro: na troca de fase o
+       `carregarFase` é await-ado, os `respirar()` devolvem o controle ao
+       navegador, e o laço de quadro continua chamando este `atualizar` com a
+       distância DA CENA ANTERIOR — 900 m. O anel recém-nascido em 0…240 m era
+       empurrado inteiro para além dos 900, e depois vinha o `reiniciarPosicao(0)`
+       sem caminho de volta. Resultado: meio quilômetro de parque vazio na
+       entrada da cena 2, e a primeira coisa a aparecer era a London Eye.
+
+       Como cada bloco tem uma vaga fixa no anel (o índice módulo N), dá para
+       reencaixá-lo na janela certa numa conta só, para frente ou para trás.
+       Isso conserta junto o atalho `?dist=`, que passa a valer já no primeiro
+       quadro em vez de precisar de doze segundos de recuperação. */
+    const N = blocos.length;
+    const primeiro = Math.floor((zJogador - BLOCO) / BLOCO);
     for (const b of blocos) {
-      if (b.indice < primeiroVisivel) {
-        const novo = b.indice + blocos.length;
+      const novo = primeiro + (((b.indice - primeiro) % N) + N) % N;
+      if (novo !== b.indice) {
         b.indice = novo;
         montarBloco(b.grupo, novo, b);
       }

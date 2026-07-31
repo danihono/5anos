@@ -50,11 +50,25 @@ O `build.py` concatena o `vendor/three/*.min.js` e os módulos de `js/` dentro d
 
 Sem esses parâmetros o jogo começa do início, como deve.
 
-> **Cuidado ao tirar print com `?dist=`.** Os quarteirões nascem em z≈0 e vão sendo
-> reciclados para a frente conforme ela corre; teleportar para o meio da cena não
-> os move junto. Nos primeiros segundos ainda aparecem casas onde deveria haver
-> clareira — inclusive tapando o Big Ben. Espere uns 10 s antes de julgar o
-> enquadramento. Correndo de verdade isso nunca acontece.
+## O anel de quarteirões anda nos dois sentidos
+
+O mundo é um anel de blocos de 24 m que se recicla à frente dela. Durante muito
+tempo o reciclador só sabia **empurrar para a frente**, e isso escondeu um bug
+que passou despercebido porque eu só testava as cenas pelo atalho `?fase=`:
+
+Na troca de cena, `carregarFase` é `await`-ado e os `respirar()` devolvem o
+controle ao navegador — então o laço de quadro continua rodando e chama
+`mundo.atualizar` com a distância **da cena anterior**, 900 m. O anel
+recém-nascido em 0…240 m era empurrado inteiro para além dos 900, e o
+`reiniciarPosicao(0)` que vinha depois não tinha como trazê-lo de volta.
+Resultado: meio quilômetro de parque vazio na entrada da cena 2, e a primeira
+coisa a aparecer era a London Eye. Foi o Daniel quem viu, jogando.
+
+O conserto é uma conta só, em `atualizar`: como cada bloco tem uma vaga fixa no
+anel (o índice módulo N), dá para reencaixá-lo na janela certa em qualquer
+direção, num quadro. Isso arruma junto o `?dist=`, que antes precisava de uns
+10 s de recuperação antes de valer para tirar print — hoje vale já no primeiro
+quadro.
 
 ## O Big Ben é copiado do de verdade
 
