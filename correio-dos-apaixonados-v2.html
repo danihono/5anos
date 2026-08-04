@@ -332,7 +332,7 @@
   .film{position:relative;margin:18px 0 6px;border-radius:6px;overflow:hidden;
     background:#17090c;box-shadow:0 10px 26px rgba(30,4,10,.45), inset 0 0 0 3px #2b1216;
     border:6px solid #24080d}
-  .film video{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#000}
+  .film video{display:block;width:100%;height:auto;object-fit:contain;background:#000}
   .film .grain-ov{position:absolute;inset:0;pointer-events:none;opacity:.5;mix-blend-mode:overlay;
     background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.5'/%3E%3C/svg%3E");
     animation:grainjump .5s steps(3) infinite}
@@ -534,7 +534,7 @@ const CONFIG = {
       video:"videos/campeao.mp4", poster:null },   // ← VÍDEO 04 ✔
 
     { tipo:"telegrama", data:"janeiro de 2024", cidade:"MARATAÍZES · ES",
-      texto:"RELATORIO DO CAMPING DO SIRI PT CONSTATADO VICIO DA SRTA ISADORA EM SORVETES PT CONSTATADO VICIO DO REMETENTE EM COMER OS SORVETES DA SRTA ISADORA PT CASO SEM SOLUCAO PT E SEM RECLAMACOES PT",
+      texto:"RELATÓRIO DO CAMPING DO SIRI. CONSTATADO VÍCIO DA SRTA. ISADORA EM SORVETES. CONSTATADO VÍCIO DO REMETENTE EM COMER OS SORVETES DA SRTA. ISADORA. CASO SEM SOLUÇÃO E SEM RECLAMAÇÕES.",
       video:"videos/es.mp4", poster:null },   // ← VÍDEO 05 ✔
 
     { tipo:"carta", data:"dezembro de 2024", cidade:"NO MEIO DA MULTIDÃO",
@@ -544,7 +544,7 @@ const CONFIG = {
       video:"videos/show.mp4", poster:null },   // ← VÍDEO 06 ✔
 
     { tipo:"telegrama", data:"janeiro de 2025", cidade:"ESPAÇO AÉREO",
-      texto:"DECOLAGEM CONFIRMADA PT PRIMEIRO VOO JUNTOS RUMO A FLORIANOPOLIS PT MAOS DADAS ACIMA DAS NUVENS PT ALTITUDE ELEVADA VG CORACAO MAIS AINDA PT",
+      texto:"DECOLAGEM CONFIRMADA. PRIMEIRO VOO JUNTOS RUMO A FLORIANÓPOLIS. MÃOS DADAS ACIMA DAS NUVENS. ALTITUDE ELEVADA, CORAÇÃO MAIS AINDA.",
       video:"videos/primeiroaviao.mp4", poster:null },   // ← VÍDEO 07 ✔
 
     { tipo:"carta", data:"agosto de 2025", cidade:"A BORDO DO CORSA",
