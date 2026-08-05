@@ -1,3 +1,8 @@
 __pycache__/
 *.pyc
 index-demo.html
+
+# A música de fundo fica de fora do repositório de propósito. Ela é uma faixa
+# comercial, o presente é particular, e commitar aqui seria publicá-la. O jogo
+# lê o arquivo do disco e roda sem ele — ver o LEIA-ME.
+musica/

@@ -44,6 +44,12 @@ const DESTINO_CARTAS = 'correio-dos-apaixonados-v2.html';
 const FOV_BASE = 54;
 const PROPORCAO_REF = 16 / 9;
 
+/* A música que toca a corrida inteira. Basta salvar o arquivo com este nome
+   dentro de `musica/` — nada mais precisa ser mexido, e se o arquivo não
+   estiver lá o jogo roda exatamente como sempre rodou, com o som sintetizado.
+   Ver o LEIA-ME. */
+const MUSICA_DE_FUNDO = 'musica/perfect.mp3';
+
 function fovVertical(fovDeitado, aspecto) {
   const meiaH = Math.atan(Math.tan((fovDeitado * Math.PI / 360)) * PROPORCAO_REF);
   const v = 2 * Math.atan(Math.tan(meiaH) / Math.max(aspecto, 0.42)) * 180 / Math.PI;
@@ -1017,6 +1023,14 @@ export function iniciar() {
     elIntro.hidden = true;
     Som.iniciar();
     Som.retomar();
+    /* A música vem ANTES do ambiente: o `Som.ambiente` olha se há música
+       tocando para decidir o volume do pad. E ela é ligada aqui, no gesto de
+       apertar "começar" — navegador nenhum deixa tocar áudio antes disso.
+
+       Depois daqui ela nunca mais é tocada: `carregarFase` chama `ambiente`
+       de novo em cada troca de cena, e a música tem que atravessar as três
+       sem recomeçar do zero. */
+    Som.musica(MUSICA_DE_FUNDO, { volume: 0.42 });
     Som.ambiente(fase.som);
     elHud.classList.add('on');
     elEscapar.classList.add('on');
@@ -1115,6 +1129,7 @@ export function iniciar() {
         get preset() { return preset; },
         get qualidade() { return qualidade; },
         get vigia() { return { ativo: vigiaAtivo, amostras: vigiaTempos.length }; },
+        get som() { return { musica: Som.temMusica() }; },
       };
     }
 

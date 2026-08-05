@@ -642,6 +642,12 @@ function criarPontos(fase, alvo, preset, telas = [], acendiveis = []) {
     else if (p.tipo === 'ponte') obj = fazTowerBridge();
     else if (p.tipo === 'piccadilly') obj = fazPiccadilly(fase);
     else if (p.tipo === 'coreto') obj = fazCoreto();
+    else if (p.tipo === 'onibus') {
+      obj = CONSTRUTORES.onibus(p.destino).objeto;
+      // vem do cache de obstaculos.js: o dispose da fase não pode encostar
+      obj.userData.compartilhado = true;
+    }
+    else if (p.tipo === 'discos') obj = fazLojaDeDiscos();
     if (!obj) continue;
     if (obj.userData.painel) telas.push(...obj.userData.painel);
     if (obj.userData.acender) acendiveis.push(obj.userData.acender);
@@ -1101,6 +1107,91 @@ function fazBalaustrada(comprimento, lado) {
  * frio lê como "aço branco na sombra" e devolve o desenho da estrutura.
  */
 /**
+ * A loja de discos da rua da agência.
+ *
+ * Fica no trecho depois da Tower Bridge, encostada na fileira de casas, e ela
+ * passa a poucos metros — que é o único jeito de a vitrine ser lida correndo.
+ * Vitrine acesa, toldo, placa e um disco exposto na janela.
+ *
+ * Tudo em `z` negativo e `x` pequeno: a loja é montada como se olhasse para a
+ * rua, e quem posiciona é o ponto lá no `fases.js`.
+ */
+function fazLojaDeDiscos() {
+  const g = new Group();
+  const matMadeira = new MeshStandardMaterial({ color: new Color('#33212a'), roughness: 0.8 });
+  const matOuro = new MeshStandardMaterial({ color: new Color('#c9973f'), roughness: 0.45, metalness: 0.6 });
+
+  // a caixa da loja, rasa: ela encosta na fachada em vez de furar o quarteirão
+  const caixa = new Mesh(new BoxGeometry(6.2, 4.2, 1.1), matMadeira);
+  caixa.position.set(0, 2.1, -0.55);
+  caixa.castShadow = true;
+  g.add(caixa);
+
+  /* A vitrine acesa. A primeira versão tinha emissiva 2.6, e com o bloom por
+     cima ela estourava em branco: a luz aparecia de longe e engolia tudo o que
+     estava dentro dela, que é justamente o que a loja tem para mostrar. */
+  const vidro = new Mesh(new BoxGeometry(4.6, 2.2, 0.12), new MeshStandardMaterial({
+    color: new Color('#ffe9c0'), emissive: new Color('#ffcf8a'),
+    emissiveIntensity: 1.5, roughness: 1,
+  }));
+  vidro.position.set(0, 1.7, 0.06);
+  g.add(vidro);
+
+  /* O cartaz é quem carrega a marca. O disco exposto é lindo, mas a etiqueta
+     dele tem 30 cm num objeto redondo e a 25 m isso é um ponto claro — a
+     mesma conta de sempre. Um cartaz reto de 1,3 m sobrevive à distância. */
+  const cartazTex = Mat.placaTexto(['1D'], {
+    largura: 512, altura: 512, corTexto: '#f4f7ff', corFundo: '#16223f', filete: false,
+  });
+  const cartaz = new Mesh(new BoxGeometry(1.3, 1.3, 0.05), new MeshStandardMaterial({
+    map: cartazTex.map, emissiveMap: cartazTex.map,
+    emissive: new Color('#ffffff'), emissiveIntensity: 0.85, roughness: 0.9,
+  }));
+  cartaz.position.set(-1.35, 1.78, 0.17);
+  g.add(cartaz);
+
+  // o disco na vitrine, ao lado: é ele que diz "loja de discos"
+  const disco = new Mesh(new CylinderGeometry(0.55, 0.55, 0.05, 24),
+    new MeshStandardMaterial({ color: new Color('#141317'), roughness: 0.5 }));
+  disco.rotation.x = Math.PI / 2;
+  disco.position.set(0.35, 1.85, 0.16);
+  g.add(disco);
+  const rotulo = new Mesh(new CylinderGeometry(0.2, 0.2, 0.06, 20),
+    new MeshStandardMaterial({ color: new Color('#e9dcc2'), roughness: 0.8 }));
+  rotulo.rotation.x = Math.PI / 2;
+  rotulo.position.set(0.35, 1.85, 0.19);
+  g.add(rotulo);
+
+  // uma pilha de capas na ponta, só como volume e cor
+  for (let i = 0; i < 2; i++) {
+    const capa = new Mesh(new BoxGeometry(0.66, 0.66, 0.05), new MeshStandardMaterial({
+      color: new Color(['#c02a3e', '#2f7a68'][i]), roughness: 0.85,
+    }));
+    capa.position.set(1.62, 1.32 + i * 0.78, 0.16);
+    capa.rotation.z = (i - 0.5) * 0.07;
+    g.add(capa);
+  }
+
+  // toldo e placa com o nome
+  const toldo = new Mesh(new BoxGeometry(6, 0.18, 1.15), matOuro);
+  toldo.position.set(0, 3.05, 0.5);
+  toldo.rotation.x = -0.14;
+  g.add(toldo);
+
+  const placaTex = Mat.placaTexto(['RECORDS'], {
+    largura: 1024, altura: 256, corTexto: '#f6ecd6', corFundo: '#3d1420', filete: false,
+  });
+  const placa = new Mesh(new BoxGeometry(5.2, 0.9, 0.14), new MeshStandardMaterial({
+    map: placaTex.map, emissiveMap: placaTex.map,
+    emissive: new Color('#ffffff'), emissiveIntensity: 1.1, roughness: 0.85,
+  }));
+  placa.position.set(0, 3.65, 0.1);
+  g.add(placa);
+
+  return g;
+}
+
+/**
  * O coreto do parque, logo na entrada da cena 2.
  *
  * Ele existe por um motivo de ritmo: a cena abria com oitocentos metros de
@@ -1486,7 +1577,7 @@ function fazPiccadilly(fase) {
      Cada linha é [x, y, largura, altura] em fração da parede, mais a cor de
      fundo e o desenho que vai por cima. */
   const MOSAICO = [
-    [0.02, 0.52, 0.42, 0.44, '#1f4fd8', 'logo'],
+    [0.02, 0.52, 0.42, 0.44, '#1f4fd8', 'marca'],
     [0.46, 0.74, 0.20, 0.22, '#e8b33a', 'tarja'],
     [0.46, 0.52, 0.20, 0.20, '#d9d4c8', 'listras'],
     [0.68, 0.52, 0.30, 0.44, '#e01b2e', 'logo'],
@@ -1536,6 +1627,27 @@ function fazPiccadilly(fase) {
     const w = fw * (LARG - 2), h = fh * ALTURA_TELA;
     const px = (fx + fw / 2) * (LARG - 2) - (LARG - 2) / 2;
     const py = BASE + fy * ALTURA_TELA + h / 2 - ALTURA_TELA * 0.03;
+
+    /* O painel grande da esquerda é o anúncio da banda. Treze metros por nove,
+       e no auge da olhada a fachada está a uns 60 m: a marca ocupa um pedação
+       da tela e não precisa de legenda para ninguém entender.
+
+       Ele fica FORA do piscar dos outros (não entra em `painel`): o piscar é o
+       que faz o mosaico parecer vivo, mas num painel com texto ele apaga o
+       nome bem na hora em que a câmera está olhando. */
+    if (estilo === 'marca') {
+      const tex = Mat.placaTexto(['1D'], {
+        largura: 512, altura: 512, corTexto: '#f4f7ff', corFundo: cor, filete: false,
+      });
+      const alvo = new Mesh(new BoxGeometry(w - 0.35, h - 0.35, 0.35), new MeshStandardMaterial({
+        map: tex.map, emissiveMap: tex.map,
+        emissive: new Color('#ffffff'), emissiveIntensity: 2.2, roughness: 1,
+      }));
+      alvo.position.set(px, py, 0.25);
+      fachada.add(alvo);
+      continue;
+    }
+
     const tela = new Mesh(new BoxGeometry(w - 0.35, h - 0.35, 0.35), new MeshStandardMaterial({
       color: new Color(cor), emissive: new Color(cor), emissiveIntensity: 2.4, roughness: 1,
     }));
@@ -2617,12 +2729,21 @@ export function criarMundo(cena, renderer, fase, preset) {
       if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); }
     });
     fachadas.forEach((f) => f.material.dispose());
-    // os marcos do trajeto têm geometria e material próprios, criados uma vez
+    /* Os marcos do trajeto têm geometria e material próprios, criados uma vez —
+       MENOS os que saem dos construtores de obstáculo (os ônibus da linha 1D),
+       que compartilham o cache de `obstaculos.js` com os obstáculos de verdade.
+       Descartar aquilo aqui deixaria o ônibus-obstáculo da cena seguinte com
+       protótipo furado, que é exatamente a armadilha descrita logo acima sobre
+       os adereços. Daí a marca no `userData`. */
     pontosGrupo.traverse((o) => {
-      if (o.isMesh) {
-        if (o.geometry) o.geometry.dispose();
-        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
+      if (!o.isMesh) return;
+      let p = o;
+      while (p) {
+        if (p.userData && p.userData.compartilhado) return;
+        p = p.parent;
       }
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
     });
     limparProps();
 

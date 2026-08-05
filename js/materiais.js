@@ -650,28 +650,45 @@ export function fachada({ semente = 1, andares = 5, tijolo = true, corBase = '#6
  * o mesmo que está no site das cartas.
  */
 export function placaTexto(linhas, { largura = 1024, altura = 256, corTexto = '#f8eeda',
-                                     corFundo = '#4a1219', fonte = 'Alfa Slab One' } = {}) {
-  return lembrado(`placa:${linhas.join('|')}:${corTexto}:${corFundo}`, () => {
+                                     corFundo = '#4a1219', fonte = 'Alfa Slab One',
+                                     filete = true, aperto = 1 } = {}) {
+  return lembrado(`placa:${linhas.join('|')}:${corTexto}:${corFundo}:${filete}:${aperto}:${fonte}`, () => {
     const c = tela(largura, altura);
     const ctx = c.getContext('2d');
     ctx.fillStyle = corFundo;
     ctx.fillRect(0, 0, largura, altura);
 
-    // filete dourado em volta
-    ctx.strokeStyle = '#c9973f';
-    ctx.lineWidth = 8;
-    ctx.strokeRect(10, 10, largura - 20, altura - 20);
+    /* O filete dourado é da placa da agência. Letreiro de ônibus e vitrine de
+       loja não têm moldura de correio — daí a opção. */
+    if (filete) {
+      ctx.strokeStyle = '#c9973f';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(10, 10, largura - 20, altura - 20);
+    }
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const alturaLinha = altura / (linhas.length + 0.6);
     linhas.forEach((linha, i) => {
-      const tam = Math.round(alturaLinha * (linhas.length === 1 ? 0.62 : 0.72));
+      const tam = Math.round(alturaLinha * (linhas.length === 1 ? 0.62 : 0.72) * aperto);
       // a fonte pode não ter carregado; a serifa do sistema segura o texto
       ctx.font = `${tam}px "${fonte}", Georgia, serif`;
       ctx.fillStyle = corTexto;
       const y = alturaLinha * (i + 0.8);
-      ctx.fillText(linha, largura / 2, y);
+      /* Letreiro de ônibus tem largura fixa e nome de cidade não tem: com
+         "WOLVERHAMPTON" o texto saía pelas beiradas do painel. Espremer é o que
+         o letreiro de verdade faz — a placa não estica. */
+      const largMax = largura * 0.9;
+      const medida = ctx.measureText(linha).width;
+      if (medida > largMax) {
+        ctx.save();
+        ctx.translate(largura / 2, 0);
+        ctx.scale(largMax / medida, 1);
+        ctx.fillText(linha, 0, y);
+        ctx.restore();
+      } else {
+        ctx.fillText(linha, largura / 2, y);
+      }
     });
 
     const t = texturaDe(c, { cor: true });
@@ -706,6 +723,8 @@ uniform float tamanhoSol, forcaSol, neblina;
 uniform vec3 corNuvemFina, corNuvemDensa;
 uniform float nuvens, nuvemCobertura, nuvemEscala, tempoCeu;
 uniform vec2 nuvemVento;
+uniform vec3 dirEstrela, corEstrela;
+uniform float forcaEstrela;
 
 float hashCeu(vec2 p){
   p = fract(p * vec2(127.1, 311.7));
@@ -793,6 +812,39 @@ void main(){
 
   // banho de neblina perto do horizonte: é o que dá a Londres enevoada
   cor = mix(cor, corHorizonte, neblina * (1.0 - smoothstep(-0.05, 0.42, h)));
+
+  /* Uma estrela só.
+
+     Vem por último de propósito, depois da nuvem E depois da neblina: nuvem não
+     passa na frente dela e a névoa não a apaga. Numa cena com 0,55 de neblina e
+     a estrela a treze graus de elevação, entrar antes custava um quinto do
+     brilho dela — e o ponto aqui é justamente que ela seja a coisa mais forte
+     daquele céu.
+
+     Núcleo duro, halo em volta e as duas hastes que o olho espera de uma
+     estrela brilhante: sem as hastes, nesse tamanho angular, um ponto claro lê
+     como poeira na lente e não como estrela.
+
+     Fica no shader e não como objeto na cena porque ela está no infinito —
+     assim nunca faz paralaxe, nunca sai de quadro e nunca é alcançada. */
+  if (forcaEstrela > 0.001) {
+    vec3 de = normalize(dirEstrela);
+    float cosE = max(dot(d, de), 0.0);
+    float nucleo = pow(cosE, 26000.0);
+    /* Halo curto. O primeiro tinha um termo de expoente 90, que espalha uns
+       dez graus — a estrela virava uma mancha que encostava na quina de cima do
+       quadro e engolia as próprias hastes. E halo largo já vem de graça: o
+       núcleo passa de 2, muito acima do limiar do bloom, então o pós desenha o
+       brilho em volta sozinho. Aqui fica só o miolo. */
+    float halo = pow(cosE, 2600.0) * 0.34 + pow(cosE, 320.0) * 0.07;
+    // as hastes: distância angular aos dois eixos próprios da estrela
+    vec3 eixoH = normalize(cross(de, vec3(0.0, 1.0, 0.0)));
+    vec3 eixoV = normalize(cross(eixoH, de));
+    float dh = abs(dot(d, eixoV)), dv = abs(dot(d, eixoH));
+    float hastes = (pow(cosE, 220.0) * exp(-dh * 260.0) + pow(cosE, 420.0) * exp(-dv * 320.0)) * 0.85;
+    cor += corEstrela * (nucleo * 2.6 + halo + hastes) * forcaEstrela;
+  }
+
   gl_FragColor = vec4(cor, 1.0);
 }`;
 
@@ -817,6 +869,9 @@ export function criarCeu(renderer, paleta) {
     corNuvemFina: { value: new Color(paleta.corNuvemFina ?? '#ffffff') },
     corNuvemDensa: { value: new Color(paleta.corNuvemDensa ?? '#9aa3ad') },
     tempoCeu: { value: 0 },
+    dirEstrela: { value: new Vector3().fromArray(paleta.dirEstrela ?? [0, 1, 0]).normalize() },
+    corEstrela: { value: new Color(paleta.corEstrela ?? '#eaf2ff') },
+    forcaEstrela: { value: paleta.estrela ?? 0 },
   };
 
   const malha = new Mesh(

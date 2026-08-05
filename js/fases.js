@@ -138,6 +138,27 @@ export const FASES = [
            aproximação e não de espaço vertical. */
         olhada: { de: 360, ate: 500, fov: 50, recuo: 12, subida: 1.6,
                   mira: [24, 14, 498], dofPerto: 120, dofLonge: 480 } },
+
+      /* ── os ônibus da linha 1D ──────────────────────────────────────────
+         Cinco ônibus, cinco cidades: Holmes Chapel, Doncaster, Bradford,
+         Mullingar e Wolverhampton. Todos da mesma linha. Não tem legenda
+         nenhuma e não vai ter — quem conhece reconhece, e é aí que está a
+         graça.
+
+         Ficam encostados no meio-fio, em `x = ±4.2`, que é onde os ônibus de
+         cenário já param: a meia-largura deles é 1,3, então a lataria começa em
+         2,9, e a faixa de fora com a menina dentro chega a 2,32 — 58 cm de
+         folga, sem tocar em faixa nenhuma.
+
+         Estão aqui como PONTOS, e não sorteados nos blocos, por dois motivos:
+         ponto tem `z` absoluto e não é reciclado (então a cidade não troca no
+         meio da corrida), e assim dá para garantir que os cinco aparecem.
+
+         Três nesta cena, dois na cena da agência. Fora da clareira do
+         Piccadilly (376 a 556) para não pousarem dentro da praça. */
+      { tipo: 'onibus', x: 4.2, z: 176, destino: 'HOLMES CHAPEL' },
+      { tipo: 'onibus', x: -4.2, z: 288, rot: Math.PI, destino: 'DONCASTER' },
+      { tipo: 'onibus', x: 4.2, z: 654, destino: 'BRADFORD' },
     ],
 
     padroes: PADROES_RUA,
@@ -310,6 +331,16 @@ export const FASES = [
       nuvens: 0.55, nuvemCobertura: 0.38, nuvemEscala: 0.62,
       corNuvemFina: '#212a4c', corNuvemDensa: '#463451',
       nuvemVento: [0.014, 0.004],
+
+      /* A estrela do Liam. Só nesta cena, e sem uma palavra em lugar nenhum.
+
+         A mira: a 11° de elevação e 6° para a esquerda do eixo da rua. O teto
+         é o topo do quadro na tela deitada — a câmera mira 5° abaixo do
+         horizonte com 54° de abertura vertical, então acima de 22° a estrela
+         sai de cena. Comecei a 13° e o halo dela encostava na quina de cima;
+         a 11° ela fica alta o bastante para estar no céu, inteira dentro do
+         quadro, e na chegada aparece logo acima da porta da agência. */
+      estrela: 1, dirEstrela: [0.10, 0.195, 0.95], corEstrela: '#eaf1ff',
     },
     neblina: 0.004,
     forcaHalo: 0.03,
@@ -371,6 +402,16 @@ export const FASES = [
         limpo: 62,
         nome: 'Tower Bridge',
         legenda: 'Do outro lado do rio já dá para ver a agência.', aviso: 110 },
+
+      // os dois últimos da linha 1D, já depois da ponte (que ocupa 532 a 708)
+      { tipo: 'onibus', x: -4.2, z: 748, rot: Math.PI, destino: 'MULLINGAR' },
+      { tipo: 'onibus', x: 4.2, z: 892, destino: 'WOLVERHAMPTON' },
+
+      /* A loja de discos, na reta final. Encostada na fileira de casas
+         (a fachada fica em x = 9) e virada para a rua: `x = 8.4` deixa a
+         vitrine 60 cm à frente da parede, sem furar o quarteirão. x positivo é
+         a ESQUERDA da tela. */
+      { tipo: 'discos', x: 8.4, z: 806, rot: -Math.PI / 2 },
     ],
     corRio: '#2c6b80',
 
@@ -378,7 +419,21 @@ export const FASES = [
     camera: { exposicao: 1.05, bloom: 0.85, vinheta: 0.38, grao: 0.005, gotas: 0.42, aberracao: 0,
                dof: 0.85, dofPerto: 22, dofLonge: 120,
                contraste: 0.3, saturacao: 1.18, veu: 0.16, corAmbiente: [0.98, 0.99, 1.06] },
-    som: { chuva: 0.6, vento: 0.4, acorde: [110, 164.81, 220] },
+    /* A harmonia anda nesta cena, em vez de ficar num acorde só: I–V–vi–IV em
+       Lá. O primeiro acorde é exatamente o que a cena já tocava (Lá2·Mi3·Lá3),
+       então ela não muda de identidade — só passa a caminhar.
+
+       Vale dizer o que isto é e o que não é: progressão de acordes não é de
+       ninguém, é a mais comum do pop inteiro. Ela evoca. Melodia, não —
+       melodia é a música, e a música de verdade entra pelo arquivo em
+       `musica/`, que é do Daniel. */
+    som: { chuva: 0.6, vento: 0.4, compasso: 6.5,
+           progressao: [
+             [110.00, 164.81, 220.00],   // I   — Lá
+             [82.41, 123.47, 164.81],    // V   — Mi
+             [92.50, 138.59, 185.00],    // vi  — Fá#m
+             [73.42, 110.00, 146.83],    // IV  — Ré
+           ] },
   },
 ];
 

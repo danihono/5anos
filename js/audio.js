@@ -49,11 +49,79 @@ export function retomar() {
 export function alternarMudo() {
   mudo = !mudo;
   if (mestre) mestre.gain.setTargetAtTime(mudo ? 0 : 0.9, ctx.currentTime, 0.05);
+  aplicarMudoNaMusica();
   return mudo;
 }
 
 export function estaMudo() {
   return mudo;
+}
+
+/* ── música de verdade, em arquivo ──────────────────────────────────────
+   Tudo mais aqui é sintetizado, e continua sendo. Isto é a exceção: um lugar
+   para o Daniel pôr uma faixa que ele escolheu, na pasta `musica/`.
+
+   É um <audio> comum, e NÃO o WebAudio como o resto. O motivo é o mesmo que
+   guia o projeto inteiro: o presente tem que abrir com dois cliques, em
+   `file://`, sem servidor. Ali um `fetch` de arquivo local morre no CORS e um
+   `createMediaElementSource` contamina o grafo; um <audio> com caminho
+   relativo simplesmente toca.
+
+   Se o arquivo não existir, falha calada — é assim que a demo publicada, que
+   não leva a música junto, continua funcionando sem precisar de nada. */
+let musicaEl = null;
+let musicaVolume = 0.5;
+let ultimoAmbiente = null;
+
+function aplicarMudoNaMusica() {
+  if (musicaEl) musicaEl.volume = mudo ? 0 : musicaVolume;
+}
+
+export function musica(src, { volume = 0.5, laco = true } = {}) {
+  if (!src) return;
+  // já está tocando esta faixa: não recomeça (a troca de cena passa por aqui)
+  if (musicaEl && musicaEl.dataset.src === src) return;
+  pararMusica();
+  try {
+    musicaEl = new Audio(src);
+    musicaEl.dataset.src = src;
+    musicaEl.loop = laco;
+    musicaVolume = volume;
+    musicaEl.volume = 0;
+    /* Se o arquivo não existir, o erro chega DEPOIS — e a essa altura o
+       `ambiente` já rodou e já abaixou o pad achando que tinha música. Sem
+       remontar o ambiente aqui, quem não põe música nenhuma (a demo publicada,
+       e o jogo até o Daniel salvar o mp3) ficava com o acorde de fundo quase
+       inaudível o jogo inteiro. */
+    musicaEl.addEventListener('error', () => {
+      pararMusica();
+      if (ultimoAmbiente) ambiente(ultimoAmbiente);
+    });
+    const p = musicaEl.play();
+    if (p && p.catch) p.catch(() => { /* sem gesto do usuário ainda, ou sem arquivo */ });
+    // entra em fade: começar no volume cheio dá um tapa depois do silêncio
+    const alvo = mudo ? 0 : volume;
+    let v = 0;
+    const subir = setInterval(() => {
+      if (!musicaEl) return clearInterval(subir);
+      v = Math.min(alvo, v + alvo / 40);
+      musicaEl.volume = v;
+      if (v >= alvo) clearInterval(subir);
+    }, 50);
+  } catch (e) {
+    musicaEl = null;
+  }
+}
+
+export function pararMusica() {
+  if (!musicaEl) return;
+  try { musicaEl.pause(); } catch (e) { /* nada a fazer */ }
+  musicaEl = null;
+}
+
+/** Há música de arquivo tocando? Os pads sintetizados abaixam quando sim. */
+export function temMusica() {
+  return !!musicaEl;
 }
 
 /* ── camada ambiente: chuva, vento e um pad harmônico por cena ── */
@@ -78,10 +146,13 @@ function pararAmbiente() {
 }
 
 /**
- * @param {object} cfg  {chuva:0..1, vento:0..1, acorde:[freqs], brilho:Hz}
+ * @param {object} cfg  {chuva:0..1, vento:0..1, brilho:Hz} mais a harmonia:
+ *   `acorde:[freqs]` para um acorde parado, ou `progressao:[[freqs],…]` com
+ *   `compasso` em segundos para uma que ande. Os dois são opcionais.
  */
 export function ambiente(cfg) {
   if (!ligado) return;
+  ultimoAmbiente = cfg;
   pararAmbiente();
   const t = ctx.currentTime;
   const nos = [];
@@ -137,15 +208,21 @@ export function ambiente(cfg) {
     nos.push(src, lfo);
   }
 
-  if (cfg.acorde && cfg.acorde.length) {
+  const progressao = cfg.progressao && cfg.progressao.length ? cfg.progressao : null;
+  const primeiro = progressao ? progressao[0] : cfg.acorde;
+
+  if (primeiro && primeiro.length) {
     const g = ctx.createGain();
+    /* Com música de arquivo tocando, o pad quase some: acorde sintetizado por
+       cima de uma balada não soma, suja. Ele fica só como cola grave. */
+    const forca = temMusica() ? 0.008 : 0.035;
     g.gain.value = 0;
-    g.gain.setTargetAtTime(0.035, t, 3);
+    g.gain.setTargetAtTime(forca, t, 3);
     const f = ctx.createBiquadFilter();
     f.type = 'lowpass';
     f.frequency.value = 1100;
     g.connect(f).connect(mestre);
-    const osc = cfg.acorde.map((freq, i) => {
+    const osc = primeiro.map((freq, i) => {
       const o = ctx.createOscillator();
       o.type = i === 0 ? 'sine' : 'triangle';
       o.frequency.value = freq;
@@ -156,6 +233,32 @@ export function ambiente(cfg) {
       o.start();
       return o;
     });
+
+    /* A progressão. Em vez de um acorde parado, os mesmos osciladores mudam de
+       nota em nota agendada — nada de temporizador em JavaScript, que
+       engasgaria junto com o quadro. O WebAudio aceita agendamento longe no
+       futuro, então dá para escrever a volta inteira de uma vez.
+
+       `setTargetAtTime` e não `setValueAtTime`: o salto seco de frequência dá
+       um clique audível no oscilador. A constante de 0,12 s desliza a nota,
+       que é o que um pad faz.
+
+       Quinze minutos bastam com folga: a corrida inteira dá uns quatro, e cada
+       troca de cena refaz o pad do zero. */
+    if (progressao) {
+      const compasso = cfg.compasso ?? 6;
+      const voltas = Math.ceil((15 * 60) / (compasso * progressao.length));
+      for (let volta = 0; volta < voltas; volta++) {
+        for (let c = 0; c < progressao.length; c++) {
+          if (volta === 0 && c === 0) continue;   // o primeiro já está soando
+          const quando = t + ((volta * progressao.length) + c) * compasso;
+          progressao[c].forEach((freq, i) => {
+            if (osc[i]) osc[i].frequency.setTargetAtTime(freq, quando, 0.12);
+          });
+        }
+      }
+    }
+
     padAtual = { g, osc };
   }
 
@@ -383,6 +486,7 @@ export function badaladas() {
 }
 
 export function silenciarTudo() {
+  pararMusica();
   if (!ligado) return;
   pararAmbiente();
 }

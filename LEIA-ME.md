@@ -119,6 +119,33 @@ dentro de um comentário que morava num shader fechou o template literal, o
 arquivo saiu com 1 MB feliz e a única pista era `Unexpected identifier 'd'` no
 console, com o jogo travado em "preparando Londres…".
 
+## A brincadeira escondida
+
+Tem uma referência ao One Direction espalhada pelo jogo, e ela não é explicada
+em lugar nenhum de propósito — quem ama a banda reconhece sozinha, e quem não
+conhece só vê Londres.
+
+- **Cinco ônibus, todos da linha 1D**, cada um indo para a cidade natal de um
+  deles: Holmes Chapel, Doncaster, Bradford, Mullingar e Wolverhampton. Três na
+  primeira cena, dois na última.
+- **Um telão do Piccadilly** com a marca, no painel grande da esquerda.
+- **Uma loja de discos** na reta final, com um cartaz na vitrine.
+- **Uma estrela** no céu da última cena. Essa é do Liam Payne, e é a única coisa
+  aqui que não é brincadeira.
+
+Duas decisões que valem registrar, porque as duas vieram de medir e não de
+achar. O nome da cidade **não** está no letreiro da frente do ônibus: ela vem
+correndo por trás, e um letreiro de 1,6 m a vinte metros vira uma tarja preta.
+Quem carrega o nome é o anúncio da lateral, de cinco metros e meio, embaixo das
+janelas de baixo — que é onde ônibus de Londres leva publicidade de verdade. É
+a mesma armadilha do mostrador do Big Ben e do aro da London Eye, pela terceira
+vez.
+
+E a estrela mora no shader do céu, não como objeto na cena: assim ela está no
+infinito de verdade — nunca faz paralaxe, nunca sai de quadro, nunca é
+alcançada. Entra por último no shader, depois da nuvem e depois da neblina, para
+que nada passe na frente dela nem a apague.
+
 ## O Big Ben é copiado do de verdade
 
 A Torre Elizabeth é o coração da cena 3 e não é invenção: as medidas e as cores
@@ -173,6 +200,35 @@ a partir da parede do estágio em 6.2.
 Hoje ela atravessa a praça de Westminster com o Parlamento e o Big Ben (cena 1), passa sob a roda-gigante plantada no lago (cena 2) e cruza a **Tower Bridge** entre as duas torres, com o rio dos dois lados (cena 3). Vale dizer: a icônica das duas torres é a Tower Bridge; a London Bridge é a lisa ao lado. E a ponte aqui atravessa a rua da cena, não um Tâmisa geograficamente correto — é uma Londres de desenho, não um mapa.
 
 **As cartas são intocáveis.** O `correio-dos-apaixonados-v2.html` só recebeu acréscimos: a capa preta que dissolve quando a URL traz `?from=jogo`, o brilho nos escaninhos vindos de `?c=`, e um link para jogar de novo. Abrir aquele arquivo sem parâmetro nenhum se comporta exatamente como antes.
+
+## A música
+
+O som do jogo é todo sintetizado — não há um arquivo de áudio em lugar nenhum,
+de propósito. **Menos um**, e é opcional: para pôr uma música tocando por baixo
+da corrida inteira, salve o arquivo como:
+
+```
+musica/perfect.mp3
+```
+
+E é só. Ele começa quando a pessoa aperta "começar" (antes disso navegador
+nenhum deixa tocar som), atravessa as três cenas sem recomeçar, obedece o botão
+de mudo da pausa, e faz os acordes sintetizados abaixarem para não brigarem com
+ele. Para trocar de faixa, mude o nome em `MUSICA_DE_FUNDO`, no topo do
+`js/jogo.js`.
+
+Se o arquivo não estiver lá, o jogo roda exatamente como sempre rodou, sem erro
+nenhum no console. É por isso que a versão de demonstração publicada não leva
+música junto.
+
+**A pasta `musica/` está no `.gitignore`, de propósito.** A faixa é comercial e
+o presente é particular; commitar o arquivo aqui seria publicá-lo. Ele mora no
+seu disco, ao lado do `index.html`, e o jogo o lê dali.
+
+Detalhe técnico que parece besteira e não é: a música é um `<audio>` comum, e
+não passa pelo WebAudio como todo o resto. Em `file://` um `fetch` de arquivo
+local morre no CORS e um `createMediaElementSource` contamina o grafo — e a
+regra número um aqui é o presente abrir com dois cliques, sem servidor.
 
 ## Vídeos
 

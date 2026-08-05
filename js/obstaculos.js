@@ -8,6 +8,7 @@
 import { Group, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, BoxGeometry, ConeGeometry,
          CylinderGeometry, SphereGeometry, CircleGeometry, TorusGeometry, Color, DoubleSide } from 'three';
 import { TAU, mistura, sorteio } from './util.js';
+import * as Mat from './materiais.js';
 
 const geos = {};
 const mats = {};
@@ -245,7 +246,44 @@ function CapsuleLike() {
 }
 
 /** Ônibus vermelho de dois andares, parado no ponto — bloqueia uma faixa. */
-function onibus() {
+/* O letreiro de destino. Ônibus de Londres mostra o número da linha e para
+   onde vai; aqui todos são da linha 1D, e o destino muda.
+
+   Vai na FRENTE e no lado esquerdo local — que é sempre o lado virado para ela,
+   porque o ônibus da calçada da direita nasce girado meia-volta. Sem o letreiro
+   lateral a piada só existiria para quem viesse de frente, e ela vem por trás.
+
+   Tamanho pensado para ser lido correndo: 2,2 m de painel a uns 8 m de
+   distância dão quase 180 px de largura na tela. Menor que isso é a armadilha
+   de sempre — letra menor que um pixel não desenha, só acinzenta. */
+function painelDeOnibus(linhas, larg, alt, corTexto, corFundo, brilho) {
+  /* `aperto: 1.35` porque a fonte pode não ter carregado. O jogo abre em
+     `file://` e sem internet; aí "Alfa Slab One" não chega e o texto cai na
+     serifa do sistema, que é bem mais estreita — o nome ficava ocupando meio
+     painel. Com o aperto ele cresce até bater na largura e para lá (o próprio
+     `placaTexto` espreme o que não couber), então enche o painel nos dois
+     casos. */
+  const tex = Mat.placaTexto(linhas, {
+    largura: 1024, altura: 200, corTexto, corFundo,
+    fonte: 'Alfa Slab One', filete: false, aperto: 1.35,
+  });
+  return new Mesh(new BoxGeometry(larg, alt, 0.06), new MeshStandardMaterial({
+    map: tex.map, emissiveMap: tex.map,
+    emissive: new Color('#ffffff'), emissiveIntensity: brilho, roughness: 0.9,
+  }));
+}
+
+function letreiro(destino) {
+  const g = new Group();
+  const nome = painelDeOnibus([destino], 1.62, 0.62, '#ffcf7a', '#0d0d10', 0.9);
+  const linha = painelDeOnibus(['1D'], 0.52, 0.62, '#f6f2e6', '#0d0d10', 0.9);
+  nome.position.x = -0.29;
+  linha.position.x = 0.82;
+  g.add(nome, linha);
+  return g;
+}
+
+function onibus(destino) {
   const g = new Group();
   const matVermelho = mat('onibusVermelho', () => padrao('#9c2233', { roughness: 0.42, metalness: 0.25 }));
   const matVidro = mat('vidroOnibus', () => new MeshPhysicalMaterial({
@@ -272,6 +310,34 @@ function onibus() {
     mat('creme', () => padrao('#f8eeda', { roughness: 0.6 })));
   faixa.position.set(0, 2.75, 0.6);
   g.add(faixa);
+
+  /* Sem destino é o ônibus-obstáculo de sempre. Com destino, ele entra na
+     linha 1D e ganha duas coisas.
+
+     O letreiro da frente é o correto e o bonito — e é ilegível de onde ela
+     corre. Ela vem por trás, então o que ela vê primeiro é a traseira, e o
+     letreiro de 1,6 m a 20 m de distância vira uma tarja preta. Medi e é isso.
+
+     Quem carrega o nome é o ANÚNCIO DA LATERAL, embaixo das janelas do andar de
+     baixo — onde ônibus de Londres leva publicidade de verdade. Cinco metros e
+     meio de painel a oito metros dela: dá quase meia tela, e lê-se correndo,
+     que era o critério da coisa toda. */
+  if (destino) {
+    const frente = letreiro(destino);
+    frente.position.set(0, 4.02, 5.29);
+    g.add(frente);
+
+    const anuncio = painelDeOnibus([destino], 5.4, 0.92, '#ffd98a', '#1b1016', 0.7);
+    anuncio.position.set(-1.28, 0.95, 0.2);
+    anuncio.rotation.y = -Math.PI / 2;
+    g.add(anuncio);
+
+    const marca = painelDeOnibus(['1D'], 1.15, 0.92, '#1b1016', '#f2e6cd', 0.55);
+    marca.position.set(-1.28, 0.95, -3.35);
+    marca.rotation.y = -Math.PI / 2;
+    g.add(marca);
+  }
+
   g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   return { objeto: g, ml: 1.3, mp: 5.3, y0: 0, y1: 4.4 };
 }
