@@ -404,16 +404,33 @@ function menosMovimento() {
 }
 
 /**
- * Escolhe o preset gráfico olhando para o aparelho. O jogo foi feito pensando
- * em computador, então "alto" é o normal por lá; celular começa em "baixo"
- * e a pessoa pode subir na pausa se quiser.
+ * Escolhe o preset gráfico MEDINDO o aparelho.
+ *
+ * Antes aqui tinha um `if (ehTatil()) return 'baixo'` na frente de tudo, e era
+ * o mesmo erro das árvores do parque: presumir o aparelho em vez de olhar para
+ * ele. Todo celular caía no preset mais pobre — sem bloom, sem gota na lente e
+ * desenhando um terço dos pixels de uma tela dpr 3, que o navegador depois
+ * esticava. Um celular recente de 8 núcleos aguenta o preset do meio com folga.
+ *
+ * O toque continua contando, mas como um peso a mais e não como sentença: o
+ * mesmo número de núcleos rende menos num chip de telefone, e a tela densa
+ * cobra caro por pixel. Quem confere de verdade é o vigia de tempo de quadro do
+ * `jogo.js`, que desce um degrau se o aparelho não segurar.
  */
 function qualidadeAutomatica() {
   const nucleos = navigator.hardwareConcurrency || 4;
   const mem = navigator.deviceMemory || 4;
-  if (ehTatil() || nucleos <= 4 || mem <= 3) return 'baixo';
-  if (nucleos <= 8 || mem <= 6) return 'medio';
-  return 'alto';
+  const denso = (devicePixelRatio || 1) >= 2.5;
+
+  let nota = 0;
+  nota += nucleos >= 12 ? 3 : nucleos >= 8 ? 2 : nucleos >= 6 ? 1 : 0;
+  nota += mem >= 8 ? 3 : mem >= 6 ? 2 : mem >= 4 ? 1 : 0;
+  if (ehTatil()) nota -= 2;   // o mesmo núcleo rende menos num telefone
+  if (denso) nota -= 1;       // e a tela densa cobra por pixel
+
+  if (nota >= 4) return 'alto';
+  if (nota >= 1) return 'medio';
+  return 'baixo';
 }
 
 /* O preset baixo é para o jogo ficar mais LEVE, não mais pobre. Ele tinha 45%
@@ -421,11 +438,22 @@ function qualidadeAutomatica() {
    (`ehTatil()` acima), o parque chegava vazio no aparelho do Daniel e cheio no
    monitor. Árvore é barata — tronco e três esferas, com os materiais em cache —
    então quem economiza aqui são os pixels, as sombras e a chuva, não o cenário. */
+/* `amostras` é o MSAA do alvo onde a cena é desenhada (ver `js/pos.js`): é o
+   único antialiasing que este jogo pode ter, porque para a tela só vai o
+   quadrado do passe final. Sem ele todo telhado, poste e cabo da roda-gigante
+   fica em escada — é o que mais denunciava "brinquedo" na imagem.
+
+   `sombraExt` é o meio-lado, em metros, do frustum da sombra. Ele acompanha o
+   tamanho do mapa de propósito: 512 texels espalhados em 68 m dão 7 por metro,
+   que é papa. Mapa menor, área menor, densidade parecida nos três presets. */
 const PRESETS = {
-  alto:  { pixelRatio: 2,   sombra: 2048, chuva: 9000, bloomNiveis: 3, distancia: 260, arvores: 1,   gotas: 1 },
-  medio: { pixelRatio: 1.5, sombra: 1024, chuva: 4500, bloomNiveis: 2, distancia: 220, arvores: .9,  gotas: 1 },
-  baixo: { pixelRatio: 1,   sombra: 512,  chuva: 1800, bloomNiveis: 0, distancia: 200, arvores: .8,  gotas: 0 },
+  alto:  { pixelRatio: 2,    sombra: 2048, chuva: 9000, bloomNiveis: 3, distancia: 260, arvores: 1,   gotas: 1, amostras: 4, sombraExt: 34, dof: 1 },
+  medio: { pixelRatio: 1.5,  sombra: 1024, chuva: 4500, bloomNiveis: 2, distancia: 220, arvores: .9,  gotas: 1, amostras: 2, sombraExt: 28, dof: 1 },
+  baixo: { pixelRatio: 1.25, sombra: 512,  chuva: 1800, bloomNiveis: 1, distancia: 200, arvores: .8,  gotas: 0, amostras: 2, sombraExt: 22, dof: 0 },
 };
+
+/** Da mais pesada para a mais leve — usado pelo vigia de tempo de quadro. */
+const ESCADA_QUALIDADE = ['alto', 'medio', 'baixo'];
 
 /** Guarda progresso sem explodir se o navegador bloquear o localStorage. */
 const memoria = {
@@ -446,7 +474,7 @@ const memoria = {
   },
 };
 
-return { TAU, limita, mistura, amortece, suave, suaveEntre, sorteio, $, ehTatil, menosMovimento, qualidadeAutomatica, PRESETS, memoria };
+return { TAU, limita, mistura, amortece, suave, suaveEntre, sorteio, $, ehTatil, menosMovimento, qualidadeAutomatica, PRESETS, ESCADA_QUALIDADE, memoria };
 })();
 
 /* ── js/audio.js ── */
@@ -846,7 +874,7 @@ return { iniciar, retomar, alternarMudo, estaMudo, ambiente, passo, respingo, pu
 
 /* ── js/materiais.js ── */
 __M['materiais'] = (function(){
-const { SRGBColorSpace, RepeatWrapping, CanvasTexture, LinearFilter, LinearMipmapLinearFilter, BackSide, ShaderMaterial, SphereGeometry, Mesh, Scene, PMREMGenerator, Vector3, Color, Shape, ExtrudeGeometry } = THREE;
+const { SRGBColorSpace, RepeatWrapping, CanvasTexture, LinearFilter, LinearMipmapLinearFilter, BackSide, ShaderMaterial, SphereGeometry, Mesh, Scene, PMREMGenerator, Vector3, Vector2, Color, Shape, ExtrudeGeometry } = THREE;
 const { sorteio, limita, mistura } = __M['util'];
 /* ═══════════════ materiais — texturas geradas em canvas, sem nenhum arquivo ═══════════════
    O realismo aqui não vem de polígono, vem de material e luz: mapa de cor,
@@ -973,6 +1001,30 @@ function texturaDe(canvas, { cor = false, repete = [1, 1] } = {}) {
   if (cor) t.colorSpace = SRGBColorSpace;
   t.needsUpdate = true;
   return t;
+}
+
+/**
+ * Ondulação da água: só o mapa de normal, para escorregar por cima da cor.
+ *
+ * A água do lago e a do Tâmisa eram cor chapada — e água parada de cor chapada
+ * é a coisa que mais denuncia maquete. Aqui não entra reflexo de verdade
+ * (caro), entra normal: a superfície deixa de ser um plano perfeito, então o
+ * céu bate nela em ângulos diferentes a cada palmo e vira cintilação em vez de
+ * chapa. Duas escalas de ruído, a larga mandando na forma e a fina quebrando a
+ * silhueta de perto.
+ *
+ * Cada usuário deve pedir um `.clone()`: a imagem é compartilhada, mas
+ * `repeat` e `offset` precisam ser de cada um, e é o `offset` que anima.
+ */
+function ondulacao(semente = 7) {
+  return lembrado(`ondulacao:${semente}`, () => {
+    const L = 256, A = 256;
+    const largo = ruidoTileavel(L, A, 4, 3, semente);
+    const fino = ruidoTileavel(L, A, 13, 2, semente + 31);
+    const altura = new Float32Array(L * A);
+    for (let i = 0; i < altura.length; i++) altura[i] = largo[i] * 0.74 + fino[i] * 0.26;
+    return texturaDe(normalDaAltura(altura, L, A, 1.4));
+  });
 }
 
 /* ── geometria ─────────────────────────────────────────────────────────── */
@@ -1525,6 +1577,39 @@ const FRAG_CEU = `
 varying vec3 vDir;
 uniform vec3 corAlto, corHorizonte, corBaixo, corSol, dirSol;
 uniform float tamanhoSol, forcaSol, neblina;
+uniform vec3 corNuvemFina, corNuvemDensa;
+uniform float nuvens, nuvemCobertura, nuvemEscala, tempoCeu;
+uniform vec2 nuvemVento;
+
+float hashCeu(vec2 p){
+  p = fract(p * vec2(127.1, 311.7));
+  p += dot(p, p + 34.23);
+  return fract(p.x * p.y);
+}
+
+/* Ruído de valor com interpolação suave. Vale mais que o ruído puro por um
+   motivo prático: quina de célula em nuvem lê como bloco, e bloco no céu é a
+   coisa mais artificial que existe. */
+float ruidoCeu(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hashCeu(i);
+  float b = hashCeu(i + vec2(1.0, 0.0));
+  float c = hashCeu(i + vec2(0.0, 1.0));
+  float d = hashCeu(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbmCeu(vec2 p){
+  float v = 0.0, amp = 0.5;
+  for (int i = 0; i < 3; i++){
+    v += ruidoCeu(p) * amp;
+    p = p * 2.03 + vec2(11.7, 5.3);
+    amp *= 0.5;
+  }
+  return v;
+}
+
 void main(){
   vec3 d = normalize(vDir);
   float h = d.y;
@@ -1535,6 +1620,50 @@ void main(){
   float cosA = max(dot(d, normalize(dirSol)), 0.0);
   cor += corSol * pow(cosA, tamanhoSol) * forcaSol;
   cor += corSol * pow(cosA, 3.0) * forcaSol * 0.16;
+
+  /* Nuvem. O céu era um degradê liso ocupando um terço do quadro — numa
+     Londres de chuva isso é o que mais entregava "cenário" em vez de céu.
+
+     A conta é a de sempre para nuvem barata: projeta a direção do olhar num
+     plano lá em cima e sorteia ruído nesse plano.
+
+     Duas medidas mandaram nos números aqui, e sem elas a nuvem simplesmente
+     não aparecia. A primeira: o jogo NUNCA olha para o alto — com a câmera
+     mirando 5° abaixo do horizonte e 54° de abertura vertical, o topo do
+     quadro fica a 22°, ou seja, todo o céu jogável cabe em h de 0 a 0,37.
+     Máscara que só abria em 0,30 deixava a nuvem numa tira invisível no topo.
+     A segunda: dividir por h joga a projeção para o infinito rente ao
+     horizonte, então o divisor leva um "+ 0,14". Isso mantém a perspectiva
+     (nuvem menor ao longe) sem a explosão que virava listra esticada — e de
+     quebra deixa a coordenada num intervalo em que o ruído tem célula
+     suficiente para desenhar forma. */
+  if (nuvens > 0.001) {
+    float mascara = smoothstep(0.004, 0.085, h);
+    vec2 plano = d.xz / (h + 0.14);
+    vec2 p = plano * nuvemEscala + nuvemVento * tempoCeu;
+    /* Normalizado, senão a cobertura pedida mente. As três oitavas somam no
+       máximo 0.875 e ficam em torno de 0.44, então um corte de 0.34 — que a
+       gente escreve pensando "66% de cobertura" — caía ABAIXO da média e
+       fechava o céu inteiro. Foi assim que a cena da chuva virou uma chapa
+       leitosa sem degradê nenhum. */
+    float n = fbmCeu(p) / 0.875;
+    float corte = 1.0 - nuvemCobertura;
+    /* Faixa estreita de propósito: o que faz ler como nuvem é a BORDA entre o
+       furo e o corpo. Rampa larga devolve o mesmo cinza médio em todo lugar,
+       que é neblina, não nuvem. */
+    float dens = smoothstep(corte, corte + 0.20, n) * mascara * nuvens;
+
+    /* Nuvem é vista POR BAIXO, e isso decide as cores: onde ela é fina a luz
+       atravessa e ela é clara; onde engrossa, a barriga fica pesada e escura.
+       (À noite inverte, e por isso a cor vem da fase: aí é o brilho da cidade
+       que acende justamente a barriga mais grossa.) */
+    vec3 corN = mix(corNuvemFina, corNuvemDensa, smoothstep(corte, corte + 0.34, n));
+    /* A borda fina é onde o sol atravessa, e é o que faz a nuvem parecer
+       fotografada em vez de pintada. Por isso o realce entra proporcional ao
+       que FALTA de densidade. */
+    corN += corSol * pow(cosA, 8.0) * forcaSol * 0.55 * (1.0 - dens);
+    cor = mix(cor, corN, dens);
+  }
 
   // banho de neblina perto do horizonte: é o que dá a Londres enevoada
   cor = mix(cor, corHorizonte, neblina * (1.0 - smoothstep(-0.05, 0.42, h)));
@@ -1555,6 +1684,13 @@ function criarCeu(renderer, paleta) {
     tamanhoSol: { value: paleta.tamanhoSol ?? 160 },
     forcaSol: { value: paleta.forcaSol ?? 1 },
     neblina: { value: paleta.neblinaCeu ?? 0.35 },
+    nuvens: { value: paleta.nuvens ?? 0 },
+    nuvemCobertura: { value: paleta.nuvemCobertura ?? 0.5 },
+    nuvemEscala: { value: paleta.nuvemEscala ?? 0.09 },
+    nuvemVento: { value: new Vector2().fromArray(paleta.nuvemVento ?? [0.004, 0.0015]) },
+    corNuvemFina: { value: new Color(paleta.corNuvemFina ?? '#ffffff') },
+    corNuvemDensa: { value: new Color(paleta.corNuvemDensa ?? '#9aa3ad') },
+    tempoCeu: { value: 0 },
   };
 
   const malha = new Mesh(
@@ -1586,7 +1722,7 @@ function criarCeu(renderer, paleta) {
   return { malha, ambiente: alvo.texture, uniforms, alvo };
 }
 
-return { limparCache, caixaArredondada, asfalto, calcada, paralelepipedo, grama, fachada, placaTexto, criarCeu };
+return { limparCache, ondulacao, caixaArredondada, asfalto, calcada, paralelepipedo, grama, fachada, placaTexto, criarCeu };
 })();
 
 /* ── js/pos.js ── */
@@ -1794,6 +1930,7 @@ function alvo(l, a) {
 
 function criarPos(renderer, cena, camera, opts = {}) {
   let niveis = opts.niveis ?? 3;
+  let amostras = opts.amostras ?? 0;
   let largura = 1, altura = 1;
 
   const cenaQuad = new Scene();
@@ -1873,13 +2010,19 @@ function criarPos(renderer, cena, camera, opts = {}) {
     largura = Math.max(1, l | 0);
     altura = Math.max(1, a | 0);
     soltaAlvos();
-    // o alvo principal é o único que precisa de buffer de profundidade,
-    // porque é nele que a cena 3D de verdade é desenhada — e é dele que sai
-    // a textura de profundidade usada pelo desfoque de fundo
+    /* O alvo principal é o único que precisa de buffer de profundidade,
+       porque é nele que a cena 3D de verdade é desenhada — e é dele que sai
+       a textura de profundidade usada pelo desfoque de fundo.
+
+       É TAMBÉM o único lugar onde antialiasing funciona neste jogo. A flag
+       `antialias` do renderizador não serve para nada aqui: a única coisa que
+       chega ao framebuffer da tela é o quadrado do passe final, e multiamostrar
+       um retângulo de dois triângulos não suaviza aresta nenhuma da cena. */
     rtCena = new WebGLRenderTarget(largura, altura, {
       type: HalfFloatType, format: RGBAFormat,
       minFilter: LinearFilter, magFilter: LinearFilter,
       depthBuffer: true, stencilBuffer: false,
+      samples: amostras,
     });
     rtCena.texture.colorSpace = LinearSRGBColorSpace;
     rtCena.texture.generateMipmaps = false;
@@ -1906,6 +2049,14 @@ function criarPos(renderer, cena, camera, opts = {}) {
   function render(dt) {
     const u = matFinal.uniforms;
     u.tempo.value += dt;
+
+    /* Multiamostrar custa um blit de resolução por quadro: um para a cor e,
+       se alguém for ler a profundidade, outro para ela. Quem lê a profundidade
+       é só o desfoque de fundo — que o jogo desliga no preset mais leve e nas
+       cutscenes. Fica ligado só quando serve para alguma coisa. */
+    if (amostras > 0 && 'resolveDepthBuffer' in rtCena) {
+      rtCena.resolveDepthBuffer = u.forcaDof.value > 0.001;
+    }
 
     const tonemapAntes = renderer.toneMapping;
     renderer.toneMapping = NoToneMapping;
@@ -1972,6 +2123,12 @@ function criarPos(renderer, cena, camera, opts = {}) {
     redimensiona(largura, altura);
   }
 
+  function definirAmostras(n) {
+    if (n === amostras) return;
+    amostras = n;
+    redimensiona(largura, altura);
+  }
+
   function dispose() {
     soltaAlvos();
     matBrilho.dispose(); matBorra.dispose(); matCopia.dispose();
@@ -1983,6 +2140,7 @@ function criarPos(renderer, cena, camera, opts = {}) {
     render,
     redimensiona,
     definirNiveis,
+    definirAmostras,
     dispose,
     get uniforms() { return matFinal.uniforms; },
   };
@@ -3009,6 +3167,44 @@ const FAIXA_CARRO = 4.3;                // eixo do carro estacionado
 
 /* ── chão ──────────────────────────────────────────────────────────────── */
 
+/* As superfícies de água da fase, para o `atualizar` fazer a ondulação
+   escorregar. Zerado no começo de `criarMundo` — só existe uma fase por vez. */
+const AGUAS = [];
+
+/**
+ * Água. Era cor chapada com `roughness 0.45`, e água chapada é a coisa que mais
+ * denuncia maquete: o lago do parque e o Tâmisa são áreas enormes na tela.
+ *
+ * Aqui o ganho vem do mapa de normal, não de reflexo: a superfície deixa de ser
+ * um plano perfeito, então cada palmo devolve o céu num ângulo diferente e o
+ * que era chapa vira cintilação.
+ *
+ * O cuidado documentado lá em cima continua valendo — em ângulo rasante o
+ * Fresnel de qualquer dielétrico vai a 1 e a água estoura num espelho branco do
+ * céu dourado. Por isso `metalness` fica em 0, a aspereza não desce demais e o
+ * env map entra com força reduzida: a cor própria tem que ganhar da reflexão.
+ */
+function materialAgua(cor, repete, velocidade) {
+  const normal = Mat.ondulacao().clone();
+  normal.needsUpdate = true;
+  normal.repeat.set(repete[0], repete[1]);
+  const m = new MeshStandardMaterial({
+    color: new Color(cor),
+    roughness: 0.3,
+    metalness: 0,
+    normalMap: normal,
+    envMapIntensity: 0.6,
+  });
+  /* 0.32 não desenhava nada, e o motivo não é a força: é que perturbar a
+     normal só rende quando existe alguma coisa para refletir. O céu era um
+     degradê liso, então cada ângulo devolvia quase a mesma cor. Com as nuvens
+     no céu (e portanto no env map) a ondulação passou a ter contra o que
+     variar, e aí a força pode subir sem virar plástico enrugado. */
+  m.normalScale.set(0.75, 0.75);
+  AGUAS.push({ textura: normal, velocidade });
+  return m;
+}
+
 function materialChao(texturas, repete, tinta) {
   const m = new MeshStandardMaterial({
     map: texturas.map,
@@ -3065,10 +3261,8 @@ function criarChao(fase, comprimento) {
          chega perto de 100% e a água virava um espelho branco do céu dourado.
          Fisicamente correto, visualmente errado aqui — num mundo de desenho a
          cor própria tem que ganhar. */
-      new MeshStandardMaterial({
-        color: new Color(fase.corAgua || '#2e6b7d'),
-        roughness: 0.45, metalness: 0,
-      })
+      materialAgua(fase.corAgua || '#2e6b7d',
+        [(LAGO_ATE - LAGO_DE) / 7, comprimento / 7], [0.008, 0.02])
     );
     lago.rotation.x = -Math.PI / 2;
     lago.position.set((LAGO_DE + LAGO_ATE) / 2, -0.12, 0);
@@ -3506,10 +3700,7 @@ function fazPisoDaClareira(p, fase) {
   if (p.piso === 'agua') {
     // o Tâmisa dos dois lados da ponte, abaixo do nível do tabuleiro
     // mesma razão do lago: verniz em ângulo rasante estoura para branco
-    const matAgua = new MeshStandardMaterial({
-      color: new Color(fase.corRio || '#3f6f80'),
-      roughness: 0.42, metalness: 0,
-    });
+    const matAgua = materialAgua(fase.corRio || '#3f6f80', [10, comp / 8], [0.006, 0.014]);
     for (const lado of [-1, 1]) {
       const agua = new Mesh(new PlaneGeometry(80, comp), matAgua);
       agua.rotation.x = -Math.PI / 2;
@@ -3550,9 +3741,8 @@ function fazPisoDaClareira(p, fase) {
 
     if (!p.rio) continue;
     // o rio começa na borda da praça e some na neblina
-    const agua = new Mesh(new PlaneGeometry(220, comp + 60), new MeshStandardMaterial({
-      color: new Color(fase.corRio || '#3f6f80'), roughness: 0.45, metalness: 0,
-    }));
+    const agua = new Mesh(new PlaneGeometry(220, comp + 60),
+      materialAgua(fase.corRio || '#3f6f80', [26, (comp + 60) / 8], [0.005, 0.012]));
     agua.rotation.x = -Math.PI / 2;
     agua.position.set(lado * (FRENTE_PREDIO + larg + 110), -1.4, p.z);
     g.add(agua);
@@ -5009,6 +5199,7 @@ function criarChuva(quantidade, cor, vento) {
 function criarMundo(cena, renderer, fase, preset) {
   const grupo = new Group();
   cena.add(grupo);
+  AGUAS.length = 0;   // só existe uma fase por vez
 
   const ceu = Mat.criarCeu(renderer, fase.paleta);
   // raio grande: dentro do plano distante (600) e imune ao atraso de um quadro
@@ -5024,15 +5215,24 @@ function criarMundo(cena, renderer, fase, preset) {
   sol.shadow.mapSize.set(preset.sombra, preset.sombra);
   sol.shadow.camera.near = 1;
   sol.shadow.camera.far = 160;
-  const ext = 34;
-  sol.shadow.camera.left = -ext;
-  sol.shadow.camera.right = ext;
-  sol.shadow.camera.top = ext;
-  sol.shadow.camera.bottom = -ext;
   sol.shadow.bias = -0.0012;
   sol.shadow.normalBias = 0.03;
-  // sombra como sugestão, não como mancha preta: é o que dá o ar de desenho
-  if ('intensity' in sol.shadow) sol.shadow.intensity = fase.sombra ?? 0.35;
+  if ('intensity' in sol.shadow) sol.shadow.intensity = fase.sombra ?? 0.55;
+
+  /* O frustum acompanha o tamanho do mapa. Ele já segue a menina (ver
+     `atualizar`), então não precisa cobrir o quarteirão inteiro — e cobrindo
+     menos, cada texel vale mais chão. Com 512 espalhados nos 68 m de antes
+     sobrava 7 texel por metro: a sombra dela virava um borrão quadrado. */
+  function ajustarSombra(p) {
+    const ext = p.sombraExt ?? 34;
+    sol.shadow.camera.left = -ext;
+    sol.shadow.camera.right = ext;
+    sol.shadow.camera.top = ext;
+    sol.shadow.camera.bottom = -ext;
+    sol.shadow.camera.updateProjectionMatrix();
+  }
+  ajustarSombra(preset);
+
   cena.add(sol);
   cena.add(sol.target);
 
@@ -5326,6 +5526,10 @@ function criarMundo(cena, renderer, fase, preset) {
   const acendiveis = [];
   const pontos = criarPontos(fase, pontosGrupo, preset, telas, acendiveis);
 
+  /* Última água já criada (o chão e os pisos das clareiras), então dá para
+     guardar a lista desta fase e soltar o registro compartilhado. */
+  const aguas = AGUAS.slice();
+
   /* marcos distantes, de pano de fundo */
   const marcos = new Group();
   cena.add(marcos);
@@ -5397,6 +5601,10 @@ function criarMundo(cena, renderer, fase, preset) {
     u.tamanhoSol.value = mistura(p0.tamanhoSol ?? 160, p1.tamanhoSol ?? 160, anoitecer);
     u.forcaSol.value = mistura(p0.forcaSol ?? 1, p1.forcaSol ?? 1, anoitecer);
     u.neblina.value = mistura(p0.neblinaCeu ?? 0.35, p1.neblinaCeu ?? 0.35, anoitecer);
+    u.nuvens.value = mistura(p0.nuvens ?? 0, p1.nuvens ?? 0, anoitecer);
+    u.nuvemCobertura.value = mistura(p0.nuvemCobertura ?? 0.5, p1.nuvemCobertura ?? 0.5, anoitecer);
+    misturarCor(u.corNuvemFina.value, p0.corNuvemFina ?? '#ffffff', p1.corNuvemFina ?? '#ffffff', anoitecer);
+    misturarCor(u.corNuvemDensa.value, p0.corNuvemDensa ?? '#9aa3ad', p1.corNuvemDensa ?? '#9aa3ad', anoitecer);
     u.dirSol.value.fromArray(p1.dirSol).normalize().lerp(
       new Vector3().fromArray(p0.dirSol).normalize(), 1 - anoitecer).normalize();
 
@@ -5506,7 +5714,15 @@ function criarMundo(cena, renderer, fase, preset) {
       chuva.material.uniforms.camPos.value.copy(camPos);
     }
 
-    if (ceu.malha) ceu.malha.position.copy(camPos);
+    // a ondulação escorrega devagar: é correnteza, não corredeira
+    for (const a of aguas) {
+      a.textura.offset.set(a.velocidade[0] * tempo, a.velocidade[1] * tempo);
+    }
+
+    if (ceu.malha) {
+      ceu.malha.position.copy(camPos);
+      ceu.uniforms.tempoCeu.value = tempo;
+    }
   }
 
   function dispose() {
@@ -5542,10 +5758,15 @@ function criarMundo(cena, renderer, fase, preset) {
     marcos.traverse((o) => {
       if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); }
     });
+    /* `material.dispose()` não solta as texturas dele. A imagem da ondulação
+       fica no cache de materiais (e sai no `limparCache`), mas cada água usa um
+       clone próprio, para ter `repeat` e `offset` seus — e clone é objeto de
+       GPU novo. */
+    for (const a of aguas) a.textura.dispose();
     cena.environment = null;
   }
 
-  return { grupo, atualizar, dispose, sol, ceu, blocos, chuva, pontos };
+  return { grupo, atualizar, dispose, ajustarSombra, sol, ceu, blocos, chuva, pontos };
 }
 
 return { BLOCO, LARGURA_FAIXA, FAIXAS, criarAgencia, criarMundo };
@@ -5639,10 +5860,16 @@ const FASES = [
        Com o céu fechado, as vitrines acesas e o asfalto molhado passam a
        recortar contra ele — que é o que faz esta ser a Londres chuvosa bonita
        em vez de uma folha em branco. */
+    /* A manta fechada da chuva. Cobertura alta e escala grande: são bancos
+       largos e pesados, quase sem furo, que é o céu que Londres tem quando
+       chove de verdade — e é contra ele que as vitrines acesas recortam. */
     paleta: {
       ceuAlto: '#5c7796', ceuHorizonte: '#9aa6ae', ceuBaixo: '#b3b6b2',
       corSol: '#e8e4d8', dirSol: [0.86, 0.24, -0.22], tamanhoSol: 130,
       forcaSol: 0.45, neblinaCeu: 0.32,
+      nuvens: 0.95, nuvemCobertura: 0.6, nuvemEscala: 0.5,
+      corNuvemFina: '#a7b2bd', corNuvemDensa: '#5d6b7a',
+      nuvemVento: [0.02, 0.006],
     },
     neblina: 0.0034,
     forcaHalo: 0.018,
@@ -5650,7 +5877,13 @@ const FASES = [
     corSol: '#dfe6ee', forcaLuzSol: 1.15,
     corCeuLuz: '#93a8bf', corChaoLuz: '#8d8577', forcaHemisferio: 1.15,
     corPoste: '#ffc98a', forcaPoste: 16,
-    sombra: 0.35,
+    /* Medido, não chutado: com 0.35 — e mesmo com 0.62, que era o valor da
+       cena do parque — a sombra simplesmente NÃO APARECIA no quadro. A luz
+       hemisférica e o env map preenchem o que o sol tira, e a curva em S do
+       pós comprime o resto. Só perto de 1 a sombra volta a marcar o chão. Aqui
+       fica um pouco abaixo porque é dia de chuva: sol fraco espalha de
+       verdade. */
+    sombra: 0.72,
 
     chuva: 0.75, corChuva: '#d6e4f2', vento: [-1.2, 0],
     molhado: 0.9, pedra: false,
@@ -5704,10 +5937,16 @@ const FASES = [
     velocidadeFinal: 16,
     cartas: [4, 5, 6, 7],
 
+    /* "A chuva passou": nuvem alta e rala, com muito azul entre uma e outra.
+       Cobertura baixa e escala fina fazem os flocos separados de tarde limpa —
+       e são eles que, na hora azul, seguram o último laranja do horizonte. */
     paleta: {
       ceuAlto: '#8ec2e8', ceuHorizonte: '#ffe7bb', ceuBaixo: '#f7d9a8',
       corSol: '#fff0cc', dirSol: [0.62, 0.22, 0.75], tamanhoSol: 200,
       forcaSol: 2.4, neblinaCeu: 0.34,
+      nuvens: 0.8, nuvemCobertura: 0.36, nuvemEscala: 0.8,
+      corNuvemFina: '#fff4e4', corNuvemDensa: '#d3b8ad',
+      nuvemVento: [0.012, 0.0035],
     },
     neblina: 0.0038,
     forcaHalo: 0,
@@ -5719,7 +5958,7 @@ const FASES = [
     corSol: '#ffdfae', forcaLuzSol: 2.5,
     corCeuLuz: '#d2e6fa', corChaoLuz: '#b8a67c', forcaHemisferio: 1.25,
     corPoste: '#ffe2b4', forcaPoste: 4,
-    sombra: 0.62,
+    sombra: 0.95,
 
     /* O dia cai enquanto ela corre. Começa nesta tarde dourada e termina na
        hora azul, que é quando a London Eye acende — o Daniel pediu a roda à
@@ -5755,6 +5994,13 @@ const FASES = [
       ceuAlto: '#080d26', ceuHorizonte: '#41263f', ceuBaixo: '#151129',
       corSol: '#ff8a4a', dirSol: [0.62, -0.015, 0.75], tamanhoSol: 260,
       forcaSol: 0.5, neblinaCeu: 0.14,
+      /* A nuvem some quase toda no escuro. Nuvem clara sobre céu de hora azul
+         vira mancha de leite: quem tem que aparecer aqui é a roda acesa. O
+         pouco que fica é escuro, com o laranja do horizonte pegando de raspão
+         na borda. */
+      nuvens: 0.68, nuvemCobertura: 0.42, nuvemEscala: 0.8,
+      corNuvemFina: '#3a2c45', corNuvemDensa: '#20182f',
+      nuvemVento: [0.012, 0.0035],
     },
     neblinaFim: 0.0044,
     /* A neblina do mundo tem cor própria no fim. Antes ela seguia
@@ -5833,6 +6079,13 @@ const FASES = [
       ceuAlto: '#0d1b3e', ceuHorizonte: '#3c3a63', ceuBaixo: '#211f40',
       corSol: '#ffd7a8', dirSol: [0.45, 0.3, -0.6], tamanhoSol: 220,
       forcaSol: 1.2, neblinaCeu: 0.55,
+      /* Nuvem partida de noite de cidade: escura, mas com a barriga
+         alaranjada, que é o brilho de Londres batendo nela por baixo. Sem isso
+         o céu noturno fica um azul liso perfeito, que não existe em lugar
+         nenhum onde haja luz de rua. */
+      nuvens: 0.55, nuvemCobertura: 0.38, nuvemEscala: 0.62,
+      corNuvemFina: '#212a4c', corNuvemDensa: '#463451',
+      nuvemVento: [0.014, 0.004],
     },
     neblina: 0.004,
     forcaHalo: 0.03,
@@ -5840,7 +6093,7 @@ const FASES = [
     corSol: '#b9c3ea', forcaLuzSol: 0.95,
     corCeuLuz: '#4a5c96', corChaoLuz: '#3e3442', forcaHemisferio: 0.88,
     corPoste: '#ffc070', forcaPoste: 24,
-    sombra: 0.5,
+    sombra: 0.85,
     /* A luz que acompanha ela. Existe desde o começo em jogo.js e nunca tinha
        sido ligada em fase nenhuma. Agora que ela veste couro preto, é o que
        impede a protagonista de virar uma silhueta perdida na rua noturna. */
@@ -6029,7 +6282,7 @@ return { CARTAS, FASES, gerarTrajeto, validarTrajeto, posicaoDaFaixa };
 /* ── js/jogo.js ── */
 __M['jogo'] = (function(){
 const { WebGLRenderer, Scene, PerspectiveCamera, Vector3, PCFShadowMap, SRGBColorSpace, NoToneMapping, Group, PointLight, Color } = THREE;
-const { $, limita, mistura, amortece, suaveEntre, sorteio, qualidadeAutomatica, PRESETS, ehTatil, menosMovimento, memoria } = __M['util'];
+const { $, limita, mistura, amortece, suaveEntre, sorteio, qualidadeAutomatica, PRESETS, ESCADA_QUALIDADE, ehTatil, menosMovimento, memoria } = __M['util'];
 const { criarPos } = __M['pos'];
 const { criarMenina } = __M['personagem'];
 const { criarObstaculo, COMO_PASSAR } = __M['obstaculos'];
@@ -6117,6 +6370,10 @@ function iniciar() {
 
   let renderer;
   try {
+    /* `antialias` aqui é inútil de propósito, e vale saber por quê: a cena
+       inteira é desenhada dentro do alvo do `pos.js`, e para este framebuffer
+       só vai o quadrado do passe final. O antialiasing de verdade está lá, no
+       MSAA do alvo (`preset.amostras`). */
     renderer = new WebGLRenderer({ canvas: tela, antialias: false, powerPreference: 'high-performance' });
   } catch (e) {
     semWebGL();
@@ -6128,12 +6385,24 @@ function iniciar() {
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = NoToneMapping;
   renderer.shadowMap.enabled = true;
+  /* PCF, e há um caminho fechado atrás desta linha que vale registrar.
+
+     Para amaciar a borda o óbvio seria `PCFSoftShadowMap` — mas ele foi
+     DESCONTINUADO no three r185: aceita o valor, imprime aviso no console e
+     desenha PCF comum. O substituto seria o VSM, e eu cheguei a trocar: as
+     capturas voltaram sem sombra NENHUMA — nem a menina, nem árvore, nem poste
+     marcavam o chão. Sombra que existe vale mais que penumbra que some.
+
+     Então a qualidade vem de onde dá para medir: frustum apertado em volta
+     dela (`preset.sombraExt`), que multiplica os texels por metro, e a
+     densidade certa por fase (`fase.sombra`). */
   renderer.shadowMap.type = PCFShadowMap;
 
   const cena = new Scene();
   const camera = new PerspectiveCamera(
     fovVertical(FOV_BASE, innerWidth / innerHeight), innerWidth / innerHeight, 0.25, 600);
-  const pos = criarPos(renderer, cena, camera, { niveis: preset.bloomNiveis });
+  const pos = criarPos(renderer, cena, camera,
+    { niveis: preset.bloomNiveis, amostras: preset.amostras });
 
   function semWebGL() {
     elCarregando.hidden = true;
@@ -6374,8 +6643,9 @@ function iniciar() {
     u.grao.value = menosMovimento() ? c.grao * 0.4 : c.grao;
     u.gotas.value = preset.gotas ? c.gotas : 0;
     u.aberracao.value = c.aberracao;
-    // desfoque de fundo: some no preset baixo, onde cada passe conta
-    u.forcaDof.value = preset.bloomNiveis > 0 ? (c.dof ?? 0.85) : 0;
+    // desfoque de fundo: some no preset baixo, onde cada passe conta — e junto
+    // com ele some o blit de resolução da profundidade do MSAA
+    u.forcaDof.value = preset.dof ? (c.dof ?? 0.85) : 0;
     u.dofPerto.value = c.dofPerto ?? 14;
     u.dofLonge.value = c.dofLonge ?? 66;
     u.contraste.value = c.contraste ?? 0.22;
@@ -6679,15 +6949,67 @@ function iniciar() {
     alvoS.appendChild(bs);
   }
 
-  function aplicarQualidade(nome) {
+  function aplicarQualidade(nome, lembrar = true) {
     qualidade = nome;
     preset = PRESETS[nome];
-    memoria.gravar('qualidade', nome);
+    if (lembrar) {
+      memoria.gravar('qualidade', nome);
+      vigiaAtivo = false;   // escolha da pessoa manda; o vigia se cala
+    }
     renderer.setPixelRatio(Math.min(devicePixelRatio, preset.pixelRatio));
     pos.definirNiveis(preset.bloomNiveis);
+    pos.definirAmostras(preset.amostras);
     pos.uniforms.gotas.value = preset.gotas ? fase.camera.gotas : 0;
-    if (mundo && mundo.sol) mundo.sol.shadow.mapSize.set(preset.sombra, preset.sombra);
+    pos.uniforms.forcaDof.value = preset.dof ? (fase.camera.dof ?? 0.85) : 0;
+    if (mundo && mundo.sol) {
+      mundo.sol.shadow.mapSize.set(preset.sombra, preset.sombra);
+      mundo.ajustarSombra(preset);
+    }
     redimensionar();
+  }
+
+  /* ─────────── vigia de tempo de quadro ───────────
+     Os presets subiram (MSAA, sombra macia, mais pixels no celular) e eu não
+     tenho o aparelho da Isadora na mão para saber se ele segura. Então em vez
+     de chutar baixo por precaução — que foi o erro que deixou o telefone dela
+     com um terço dos pixels — o jogo mede os primeiros segundos de corrida e
+     desce um degrau se estiver arrastando.
+
+     Mediana, não média: um pico de 300 ms compilando shader ou trocando de
+     bloco não pode condenar o aparelho. E não grava a escolha na memória, para
+     não rebaixar para sempre quem só passou por um mau momento. */
+  const VIGIA_ALVO = 28;       // ms por quadro; ~36 fps
+  const VIGIA_AQUECE = 1.5;    // s de corrida ignorados: os primeiros quadros compilam shader
+  const VIGIA_JANELA = 4;      // s de medição por decisão
+  const VIGIA_MINIMO = 12;     // amostras mínimas para a mediana significar algo
+  let vigiaTempos = [];
+  let vigiaEspera = VIGIA_AQUECE;
+  let vigiaJanela = 0;
+  let vigiaAtivo = !memoria.ler('qualidade', null);   // quem escolheu na pausa manda
+
+  /* A janela é de TEMPO, não de quadros. Contar 90 quadros parece equivalente e
+     não é: num aparelho ruim de verdade — o caso que este vigia existe para
+     socorrer — 90 quadros podem levar um minuto e meio, e a pessoa passa esse
+     minuto e meio no engasgo que era para ser consertado. Por segundos, a
+     decisão sai igual num aparelho rápido e num lento. */
+  function vigiarQuadro(ms) {
+    if (!vigiaAtivo || estado.modo !== 'correndo') return;
+    const s = ms / 1000;
+    if (vigiaEspera > 0) { vigiaEspera -= s; return; }
+    vigiaTempos.push(ms);
+    vigiaJanela += s;
+    if (vigiaJanela < VIGIA_JANELA) return;
+
+    const meio = vigiaTempos.slice().sort((a, b) => a - b)[vigiaTempos.length >> 1];
+    const bastante = vigiaTempos.length >= VIGIA_MINIMO;
+    vigiaTempos = [];
+    vigiaJanela = 0;
+
+    // poucas amostras num aparelho MUITO lento ainda é veredito: quadro enorme
+    if (bastante && meio <= VIGIA_ALVO) { vigiaAtivo = false; return; }
+    const abaixo = ESCADA_QUALIDADE[ESCADA_QUALIDADE.indexOf(qualidade) + 1];
+    if (!abaixo) { vigiaAtivo = false; return; }
+    aplicarQualidade(abaixo, false);
   }
 
   $('#btn-voltar').onclick = alternarPausa;
@@ -6943,6 +7265,8 @@ function iniciar() {
     u.velocidade.value = estado.velocidade;
     pos.render(dt);
 
+    vigiarQuadro(dtReal * 1000);
+
     contaFps++;
     tempoFps += dtReal;
     if (tempoFps >= 0.5) {
@@ -7067,6 +7391,10 @@ function iniciar() {
         get fase() { return fase; },
         get trajeto() { return trajeto; },
         get pos() { return pos; },
+        get renderer() { return renderer; },
+        get preset() { return preset; },
+        get qualidade() { return qualidade; },
+        get vigia() { return { ativo: vigiaAtivo, amostras: vigiaTempos.length }; },
       };
     }
 

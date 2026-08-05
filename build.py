@@ -16,7 +16,10 @@ Uso:  python3 build.py
 """
 
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
@@ -160,6 +163,37 @@ def envolve_modulo(fonte, nome):
     return f"__M['{Path(nome).stem}'] = (function(){{\n{corpo}\nreturn {{ {devolve} }};\n}})();\n"
 
 
+def confere_sintaxe(bundle):
+    """
+    Passa o bundle inteiro pelo `node --check`, se houver node por perto.
+
+    Existe por causa de um erro que o build engoliu calado: um comentário DENTRO
+    de um shader — que mora num template literal — tinha uma crase, e a crase
+    fechou a string. O arquivo saiu com 1 MB, o navegador abriu, e a única
+    pista era "Unexpected identifier 'd'" no console, com o jogo travado em
+    "preparando Londres…". Trinta segundos de teste para descobrir o que o node
+    diz na hora, com número de linha.
+
+    Sem node instalado o build segue: é uma rede de segurança, não um requisito.
+    """
+    node = shutil.which("node")
+    if not node:
+        return
+    with tempfile.NamedTemporaryFile("w", suffix=".mjs", encoding="utf-8", delete=False) as f:
+        f.write(bundle)
+        caminho = f.name
+    try:
+        r = subprocess.run([node, "--check", caminho], capture_output=True, text=True)
+        if r.returncode != 0:
+            erro = (r.stderr or "").strip().splitlines()
+            print("[build] o bundle não é JavaScript válido:", file=sys.stderr)
+            for linha in erro[:12]:
+                print("   " + linha.replace(caminho, "<bundle>"), file=sys.stderr)
+            sys.exit(1)
+    finally:
+        Path(caminho).unlink(missing_ok=True)
+
+
 def main():
     partes = []
 
@@ -183,6 +217,7 @@ def main():
     partes.append("__M['jogo'].iniciar();\n")
 
     bundle = "\n".join(partes)
+    confere_sintaxe(bundle)
 
     template = (RAIZ / "src/index.template.html").read_text(encoding="utf-8")
     if MARCADOR not in template:

@@ -10,7 +10,7 @@
 import { WebGLRenderer, Scene, PerspectiveCamera, Vector3, PCFShadowMap,
          SRGBColorSpace, NoToneMapping, Group, PointLight, Color } from 'three';
 import { $, limita, mistura, amortece, suaveEntre, sorteio, qualidadeAutomatica, PRESETS,
-         ehTatil, menosMovimento, memoria } from './util.js';
+         ESCADA_QUALIDADE, ehTatil, menosMovimento, memoria } from './util.js';
 import * as Som from './audio.js';
 import { criarPos } from './pos.js';
 import { criarMenina } from './personagem.js';
@@ -90,6 +90,10 @@ export function iniciar() {
 
   let renderer;
   try {
+    /* `antialias` aqui é inútil de propósito, e vale saber por quê: a cena
+       inteira é desenhada dentro do alvo do `pos.js`, e para este framebuffer
+       só vai o quadrado do passe final. O antialiasing de verdade está lá, no
+       MSAA do alvo (`preset.amostras`). */
     renderer = new WebGLRenderer({ canvas: tela, antialias: false, powerPreference: 'high-performance' });
   } catch (e) {
     semWebGL();
@@ -101,12 +105,24 @@ export function iniciar() {
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = NoToneMapping;
   renderer.shadowMap.enabled = true;
+  /* PCF, e há um caminho fechado atrás desta linha que vale registrar.
+
+     Para amaciar a borda o óbvio seria `PCFSoftShadowMap` — mas ele foi
+     DESCONTINUADO no three r185: aceita o valor, imprime aviso no console e
+     desenha PCF comum. O substituto seria o VSM, e eu cheguei a trocar: as
+     capturas voltaram sem sombra NENHUMA — nem a menina, nem árvore, nem poste
+     marcavam o chão. Sombra que existe vale mais que penumbra que some.
+
+     Então a qualidade vem de onde dá para medir: frustum apertado em volta
+     dela (`preset.sombraExt`), que multiplica os texels por metro, e a
+     densidade certa por fase (`fase.sombra`). */
   renderer.shadowMap.type = PCFShadowMap;
 
   const cena = new Scene();
   const camera = new PerspectiveCamera(
     fovVertical(FOV_BASE, innerWidth / innerHeight), innerWidth / innerHeight, 0.25, 600);
-  const pos = criarPos(renderer, cena, camera, { niveis: preset.bloomNiveis });
+  const pos = criarPos(renderer, cena, camera,
+    { niveis: preset.bloomNiveis, amostras: preset.amostras });
 
   function semWebGL() {
     elCarregando.hidden = true;
@@ -347,8 +363,9 @@ export function iniciar() {
     u.grao.value = menosMovimento() ? c.grao * 0.4 : c.grao;
     u.gotas.value = preset.gotas ? c.gotas : 0;
     u.aberracao.value = c.aberracao;
-    // desfoque de fundo: some no preset baixo, onde cada passe conta
-    u.forcaDof.value = preset.bloomNiveis > 0 ? (c.dof ?? 0.85) : 0;
+    // desfoque de fundo: some no preset baixo, onde cada passe conta — e junto
+    // com ele some o blit de resolução da profundidade do MSAA
+    u.forcaDof.value = preset.dof ? (c.dof ?? 0.85) : 0;
     u.dofPerto.value = c.dofPerto ?? 14;
     u.dofLonge.value = c.dofLonge ?? 66;
     u.contraste.value = c.contraste ?? 0.22;
@@ -652,15 +669,67 @@ export function iniciar() {
     alvoS.appendChild(bs);
   }
 
-  function aplicarQualidade(nome) {
+  function aplicarQualidade(nome, lembrar = true) {
     qualidade = nome;
     preset = PRESETS[nome];
-    memoria.gravar('qualidade', nome);
+    if (lembrar) {
+      memoria.gravar('qualidade', nome);
+      vigiaAtivo = false;   // escolha da pessoa manda; o vigia se cala
+    }
     renderer.setPixelRatio(Math.min(devicePixelRatio, preset.pixelRatio));
     pos.definirNiveis(preset.bloomNiveis);
+    pos.definirAmostras(preset.amostras);
     pos.uniforms.gotas.value = preset.gotas ? fase.camera.gotas : 0;
-    if (mundo && mundo.sol) mundo.sol.shadow.mapSize.set(preset.sombra, preset.sombra);
+    pos.uniforms.forcaDof.value = preset.dof ? (fase.camera.dof ?? 0.85) : 0;
+    if (mundo && mundo.sol) {
+      mundo.sol.shadow.mapSize.set(preset.sombra, preset.sombra);
+      mundo.ajustarSombra(preset);
+    }
     redimensionar();
+  }
+
+  /* ─────────── vigia de tempo de quadro ───────────
+     Os presets subiram (MSAA, sombra macia, mais pixels no celular) e eu não
+     tenho o aparelho da Isadora na mão para saber se ele segura. Então em vez
+     de chutar baixo por precaução — que foi o erro que deixou o telefone dela
+     com um terço dos pixels — o jogo mede os primeiros segundos de corrida e
+     desce um degrau se estiver arrastando.
+
+     Mediana, não média: um pico de 300 ms compilando shader ou trocando de
+     bloco não pode condenar o aparelho. E não grava a escolha na memória, para
+     não rebaixar para sempre quem só passou por um mau momento. */
+  const VIGIA_ALVO = 28;       // ms por quadro; ~36 fps
+  const VIGIA_AQUECE = 1.5;    // s de corrida ignorados: os primeiros quadros compilam shader
+  const VIGIA_JANELA = 4;      // s de medição por decisão
+  const VIGIA_MINIMO = 12;     // amostras mínimas para a mediana significar algo
+  let vigiaTempos = [];
+  let vigiaEspera = VIGIA_AQUECE;
+  let vigiaJanela = 0;
+  let vigiaAtivo = !memoria.ler('qualidade', null);   // quem escolheu na pausa manda
+
+  /* A janela é de TEMPO, não de quadros. Contar 90 quadros parece equivalente e
+     não é: num aparelho ruim de verdade — o caso que este vigia existe para
+     socorrer — 90 quadros podem levar um minuto e meio, e a pessoa passa esse
+     minuto e meio no engasgo que era para ser consertado. Por segundos, a
+     decisão sai igual num aparelho rápido e num lento. */
+  function vigiarQuadro(ms) {
+    if (!vigiaAtivo || estado.modo !== 'correndo') return;
+    const s = ms / 1000;
+    if (vigiaEspera > 0) { vigiaEspera -= s; return; }
+    vigiaTempos.push(ms);
+    vigiaJanela += s;
+    if (vigiaJanela < VIGIA_JANELA) return;
+
+    const meio = vigiaTempos.slice().sort((a, b) => a - b)[vigiaTempos.length >> 1];
+    const bastante = vigiaTempos.length >= VIGIA_MINIMO;
+    vigiaTempos = [];
+    vigiaJanela = 0;
+
+    // poucas amostras num aparelho MUITO lento ainda é veredito: quadro enorme
+    if (bastante && meio <= VIGIA_ALVO) { vigiaAtivo = false; return; }
+    const abaixo = ESCADA_QUALIDADE[ESCADA_QUALIDADE.indexOf(qualidade) + 1];
+    if (!abaixo) { vigiaAtivo = false; return; }
+    aplicarQualidade(abaixo, false);
   }
 
   $('#btn-voltar').onclick = alternarPausa;
@@ -916,6 +985,8 @@ export function iniciar() {
     u.velocidade.value = estado.velocidade;
     pos.render(dt);
 
+    vigiarQuadro(dtReal * 1000);
+
     contaFps++;
     tempoFps += dtReal;
     if (tempoFps >= 0.5) {
@@ -1040,6 +1111,10 @@ export function iniciar() {
         get fase() { return fase; },
         get trajeto() { return trajeto; },
         get pos() { return pos; },
+        get renderer() { return renderer; },
+        get preset() { return preset; },
+        get qualidade() { return qualidade; },
+        get vigia() { return { ativo: vigiaAtivo, amostras: vigiaTempos.length }; },
       };
     }
 

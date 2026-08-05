@@ -204,6 +204,7 @@ function alvo(l, a) {
 
 export function criarPos(renderer, cena, camera, opts = {}) {
   let niveis = opts.niveis ?? 3;
+  let amostras = opts.amostras ?? 0;
   let largura = 1, altura = 1;
 
   const cenaQuad = new Scene();
@@ -283,13 +284,19 @@ export function criarPos(renderer, cena, camera, opts = {}) {
     largura = Math.max(1, l | 0);
     altura = Math.max(1, a | 0);
     soltaAlvos();
-    // o alvo principal é o único que precisa de buffer de profundidade,
-    // porque é nele que a cena 3D de verdade é desenhada — e é dele que sai
-    // a textura de profundidade usada pelo desfoque de fundo
+    /* O alvo principal é o único que precisa de buffer de profundidade,
+       porque é nele que a cena 3D de verdade é desenhada — e é dele que sai
+       a textura de profundidade usada pelo desfoque de fundo.
+
+       É TAMBÉM o único lugar onde antialiasing funciona neste jogo. A flag
+       `antialias` do renderizador não serve para nada aqui: a única coisa que
+       chega ao framebuffer da tela é o quadrado do passe final, e multiamostrar
+       um retângulo de dois triângulos não suaviza aresta nenhuma da cena. */
     rtCena = new WebGLRenderTarget(largura, altura, {
       type: HalfFloatType, format: RGBAFormat,
       minFilter: LinearFilter, magFilter: LinearFilter,
       depthBuffer: true, stencilBuffer: false,
+      samples: amostras,
     });
     rtCena.texture.colorSpace = LinearSRGBColorSpace;
     rtCena.texture.generateMipmaps = false;
@@ -316,6 +323,14 @@ export function criarPos(renderer, cena, camera, opts = {}) {
   function render(dt) {
     const u = matFinal.uniforms;
     u.tempo.value += dt;
+
+    /* Multiamostrar custa um blit de resolução por quadro: um para a cor e,
+       se alguém for ler a profundidade, outro para ela. Quem lê a profundidade
+       é só o desfoque de fundo — que o jogo desliga no preset mais leve e nas
+       cutscenes. Fica ligado só quando serve para alguma coisa. */
+    if (amostras > 0 && 'resolveDepthBuffer' in rtCena) {
+      rtCena.resolveDepthBuffer = u.forcaDof.value > 0.001;
+    }
 
     const tonemapAntes = renderer.toneMapping;
     renderer.toneMapping = NoToneMapping;
@@ -382,6 +397,12 @@ export function criarPos(renderer, cena, camera, opts = {}) {
     redimensiona(largura, altura);
   }
 
+  function definirAmostras(n) {
+    if (n === amostras) return;
+    amostras = n;
+    redimensiona(largura, altura);
+  }
+
   function dispose() {
     soltaAlvos();
     matBrilho.dispose(); matBorra.dispose(); matCopia.dispose();
@@ -393,6 +414,7 @@ export function criarPos(renderer, cena, camera, opts = {}) {
     render,
     redimensiona,
     definirNiveis,
+    definirAmostras,
     dispose,
     get uniforms() { return matFinal.uniforms; },
   };

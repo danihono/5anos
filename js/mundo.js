@@ -38,6 +38,44 @@ const FAIXA_CARRO = 4.3;                // eixo do carro estacionado
 
 /* ── chão ──────────────────────────────────────────────────────────────── */
 
+/* As superfícies de água da fase, para o `atualizar` fazer a ondulação
+   escorregar. Zerado no começo de `criarMundo` — só existe uma fase por vez. */
+const AGUAS = [];
+
+/**
+ * Água. Era cor chapada com `roughness 0.45`, e água chapada é a coisa que mais
+ * denuncia maquete: o lago do parque e o Tâmisa são áreas enormes na tela.
+ *
+ * Aqui o ganho vem do mapa de normal, não de reflexo: a superfície deixa de ser
+ * um plano perfeito, então cada palmo devolve o céu num ângulo diferente e o
+ * que era chapa vira cintilação.
+ *
+ * O cuidado documentado lá em cima continua valendo — em ângulo rasante o
+ * Fresnel de qualquer dielétrico vai a 1 e a água estoura num espelho branco do
+ * céu dourado. Por isso `metalness` fica em 0, a aspereza não desce demais e o
+ * env map entra com força reduzida: a cor própria tem que ganhar da reflexão.
+ */
+function materialAgua(cor, repete, velocidade) {
+  const normal = Mat.ondulacao().clone();
+  normal.needsUpdate = true;
+  normal.repeat.set(repete[0], repete[1]);
+  const m = new MeshStandardMaterial({
+    color: new Color(cor),
+    roughness: 0.3,
+    metalness: 0,
+    normalMap: normal,
+    envMapIntensity: 0.6,
+  });
+  /* 0.32 não desenhava nada, e o motivo não é a força: é que perturbar a
+     normal só rende quando existe alguma coisa para refletir. O céu era um
+     degradê liso, então cada ângulo devolvia quase a mesma cor. Com as nuvens
+     no céu (e portanto no env map) a ondulação passou a ter contra o que
+     variar, e aí a força pode subir sem virar plástico enrugado. */
+  m.normalScale.set(0.75, 0.75);
+  AGUAS.push({ textura: normal, velocidade });
+  return m;
+}
+
 function materialChao(texturas, repete, tinta) {
   const m = new MeshStandardMaterial({
     map: texturas.map,
@@ -94,10 +132,8 @@ function criarChao(fase, comprimento) {
          chega perto de 100% e a água virava um espelho branco do céu dourado.
          Fisicamente correto, visualmente errado aqui — num mundo de desenho a
          cor própria tem que ganhar. */
-      new MeshStandardMaterial({
-        color: new Color(fase.corAgua || '#2e6b7d'),
-        roughness: 0.45, metalness: 0,
-      })
+      materialAgua(fase.corAgua || '#2e6b7d',
+        [(LAGO_ATE - LAGO_DE) / 7, comprimento / 7], [0.008, 0.02])
     );
     lago.rotation.x = -Math.PI / 2;
     lago.position.set((LAGO_DE + LAGO_ATE) / 2, -0.12, 0);
@@ -535,10 +571,7 @@ function fazPisoDaClareira(p, fase) {
   if (p.piso === 'agua') {
     // o Tâmisa dos dois lados da ponte, abaixo do nível do tabuleiro
     // mesma razão do lago: verniz em ângulo rasante estoura para branco
-    const matAgua = new MeshStandardMaterial({
-      color: new Color(fase.corRio || '#3f6f80'),
-      roughness: 0.42, metalness: 0,
-    });
+    const matAgua = materialAgua(fase.corRio || '#3f6f80', [10, comp / 8], [0.006, 0.014]);
     for (const lado of [-1, 1]) {
       const agua = new Mesh(new PlaneGeometry(80, comp), matAgua);
       agua.rotation.x = -Math.PI / 2;
@@ -579,9 +612,8 @@ function fazPisoDaClareira(p, fase) {
 
     if (!p.rio) continue;
     // o rio começa na borda da praça e some na neblina
-    const agua = new Mesh(new PlaneGeometry(220, comp + 60), new MeshStandardMaterial({
-      color: new Color(fase.corRio || '#3f6f80'), roughness: 0.45, metalness: 0,
-    }));
+    const agua = new Mesh(new PlaneGeometry(220, comp + 60),
+      materialAgua(fase.corRio || '#3f6f80', [26, (comp + 60) / 8], [0.005, 0.012]));
     agua.rotation.x = -Math.PI / 2;
     agua.position.set(lado * (FRENTE_PREDIO + larg + 110), -1.4, p.z);
     g.add(agua);
@@ -2038,6 +2070,7 @@ function criarChuva(quantidade, cor, vento) {
 export function criarMundo(cena, renderer, fase, preset) {
   const grupo = new Group();
   cena.add(grupo);
+  AGUAS.length = 0;   // só existe uma fase por vez
 
   const ceu = Mat.criarCeu(renderer, fase.paleta);
   // raio grande: dentro do plano distante (600) e imune ao atraso de um quadro
@@ -2053,15 +2086,24 @@ export function criarMundo(cena, renderer, fase, preset) {
   sol.shadow.mapSize.set(preset.sombra, preset.sombra);
   sol.shadow.camera.near = 1;
   sol.shadow.camera.far = 160;
-  const ext = 34;
-  sol.shadow.camera.left = -ext;
-  sol.shadow.camera.right = ext;
-  sol.shadow.camera.top = ext;
-  sol.shadow.camera.bottom = -ext;
   sol.shadow.bias = -0.0012;
   sol.shadow.normalBias = 0.03;
-  // sombra como sugestão, não como mancha preta: é o que dá o ar de desenho
-  if ('intensity' in sol.shadow) sol.shadow.intensity = fase.sombra ?? 0.35;
+  if ('intensity' in sol.shadow) sol.shadow.intensity = fase.sombra ?? 0.55;
+
+  /* O frustum acompanha o tamanho do mapa. Ele já segue a menina (ver
+     `atualizar`), então não precisa cobrir o quarteirão inteiro — e cobrindo
+     menos, cada texel vale mais chão. Com 512 espalhados nos 68 m de antes
+     sobrava 7 texel por metro: a sombra dela virava um borrão quadrado. */
+  function ajustarSombra(p) {
+    const ext = p.sombraExt ?? 34;
+    sol.shadow.camera.left = -ext;
+    sol.shadow.camera.right = ext;
+    sol.shadow.camera.top = ext;
+    sol.shadow.camera.bottom = -ext;
+    sol.shadow.camera.updateProjectionMatrix();
+  }
+  ajustarSombra(preset);
+
   cena.add(sol);
   cena.add(sol.target);
 
@@ -2355,6 +2397,10 @@ export function criarMundo(cena, renderer, fase, preset) {
   const acendiveis = [];
   const pontos = criarPontos(fase, pontosGrupo, preset, telas, acendiveis);
 
+  /* Última água já criada (o chão e os pisos das clareiras), então dá para
+     guardar a lista desta fase e soltar o registro compartilhado. */
+  const aguas = AGUAS.slice();
+
   /* marcos distantes, de pano de fundo */
   const marcos = new Group();
   cena.add(marcos);
@@ -2426,6 +2472,10 @@ export function criarMundo(cena, renderer, fase, preset) {
     u.tamanhoSol.value = mistura(p0.tamanhoSol ?? 160, p1.tamanhoSol ?? 160, anoitecer);
     u.forcaSol.value = mistura(p0.forcaSol ?? 1, p1.forcaSol ?? 1, anoitecer);
     u.neblina.value = mistura(p0.neblinaCeu ?? 0.35, p1.neblinaCeu ?? 0.35, anoitecer);
+    u.nuvens.value = mistura(p0.nuvens ?? 0, p1.nuvens ?? 0, anoitecer);
+    u.nuvemCobertura.value = mistura(p0.nuvemCobertura ?? 0.5, p1.nuvemCobertura ?? 0.5, anoitecer);
+    misturarCor(u.corNuvemFina.value, p0.corNuvemFina ?? '#ffffff', p1.corNuvemFina ?? '#ffffff', anoitecer);
+    misturarCor(u.corNuvemDensa.value, p0.corNuvemDensa ?? '#9aa3ad', p1.corNuvemDensa ?? '#9aa3ad', anoitecer);
     u.dirSol.value.fromArray(p1.dirSol).normalize().lerp(
       new Vector3().fromArray(p0.dirSol).normalize(), 1 - anoitecer).normalize();
 
@@ -2535,7 +2585,15 @@ export function criarMundo(cena, renderer, fase, preset) {
       chuva.material.uniforms.camPos.value.copy(camPos);
     }
 
-    if (ceu.malha) ceu.malha.position.copy(camPos);
+    // a ondulação escorrega devagar: é correnteza, não corredeira
+    for (const a of aguas) {
+      a.textura.offset.set(a.velocidade[0] * tempo, a.velocidade[1] * tempo);
+    }
+
+    if (ceu.malha) {
+      ceu.malha.position.copy(camPos);
+      ceu.uniforms.tempoCeu.value = tempo;
+    }
   }
 
   function dispose() {
@@ -2571,8 +2629,13 @@ export function criarMundo(cena, renderer, fase, preset) {
     marcos.traverse((o) => {
       if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); }
     });
+    /* `material.dispose()` não solta as texturas dele. A imagem da ondulação
+       fica no cache de materiais (e sai no `limparCache`), mas cada água usa um
+       clone próprio, para ter `repeat` e `offset` seus — e clone é objeto de
+       GPU novo. */
+    for (const a of aguas) a.textura.dispose();
     cena.environment = null;
   }
 
-  return { grupo, atualizar, dispose, sol, ceu, blocos, chuva, pontos };
+  return { grupo, atualizar, dispose, ajustarSombra, sol, ceu, blocos, chuva, pontos };
 }

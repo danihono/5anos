@@ -5,8 +5,8 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { SRGBColorSpace, RepeatWrapping, CanvasTexture, LinearFilter, LinearMipmapLinearFilter,
-         BackSide, ShaderMaterial, SphereGeometry, Mesh, Scene, PMREMGenerator, Vector3, Color,
-         Shape, ExtrudeGeometry } from 'three';
+         BackSide, ShaderMaterial, SphereGeometry, Mesh, Scene, PMREMGenerator, Vector3, Vector2,
+         Color, Shape, ExtrudeGeometry } from 'three';
 import { sorteio, limita, mistura } from './util.js';
 
 const cache = new Map();
@@ -127,6 +127,30 @@ function texturaDe(canvas, { cor = false, repete = [1, 1] } = {}) {
   if (cor) t.colorSpace = SRGBColorSpace;
   t.needsUpdate = true;
   return t;
+}
+
+/**
+ * Ondulação da água: só o mapa de normal, para escorregar por cima da cor.
+ *
+ * A água do lago e a do Tâmisa eram cor chapada — e água parada de cor chapada
+ * é a coisa que mais denuncia maquete. Aqui não entra reflexo de verdade
+ * (caro), entra normal: a superfície deixa de ser um plano perfeito, então o
+ * céu bate nela em ângulos diferentes a cada palmo e vira cintilação em vez de
+ * chapa. Duas escalas de ruído, a larga mandando na forma e a fina quebrando a
+ * silhueta de perto.
+ *
+ * Cada usuário deve pedir um `.clone()`: a imagem é compartilhada, mas
+ * `repeat` e `offset` precisam ser de cada um, e é o `offset` que anima.
+ */
+export function ondulacao(semente = 7) {
+  return lembrado(`ondulacao:${semente}`, () => {
+    const L = 256, A = 256;
+    const largo = ruidoTileavel(L, A, 4, 3, semente);
+    const fino = ruidoTileavel(L, A, 13, 2, semente + 31);
+    const altura = new Float32Array(L * A);
+    for (let i = 0; i < altura.length; i++) altura[i] = largo[i] * 0.74 + fino[i] * 0.26;
+    return texturaDe(normalDaAltura(altura, L, A, 1.4));
+  });
 }
 
 /* ── geometria ─────────────────────────────────────────────────────────── */
@@ -679,6 +703,39 @@ const FRAG_CEU = `
 varying vec3 vDir;
 uniform vec3 corAlto, corHorizonte, corBaixo, corSol, dirSol;
 uniform float tamanhoSol, forcaSol, neblina;
+uniform vec3 corNuvemFina, corNuvemDensa;
+uniform float nuvens, nuvemCobertura, nuvemEscala, tempoCeu;
+uniform vec2 nuvemVento;
+
+float hashCeu(vec2 p){
+  p = fract(p * vec2(127.1, 311.7));
+  p += dot(p, p + 34.23);
+  return fract(p.x * p.y);
+}
+
+/* Ruído de valor com interpolação suave. Vale mais que o ruído puro por um
+   motivo prático: quina de célula em nuvem lê como bloco, e bloco no céu é a
+   coisa mais artificial que existe. */
+float ruidoCeu(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hashCeu(i);
+  float b = hashCeu(i + vec2(1.0, 0.0));
+  float c = hashCeu(i + vec2(0.0, 1.0));
+  float d = hashCeu(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbmCeu(vec2 p){
+  float v = 0.0, amp = 0.5;
+  for (int i = 0; i < 3; i++){
+    v += ruidoCeu(p) * amp;
+    p = p * 2.03 + vec2(11.7, 5.3);
+    amp *= 0.5;
+  }
+  return v;
+}
+
 void main(){
   vec3 d = normalize(vDir);
   float h = d.y;
@@ -689,6 +746,50 @@ void main(){
   float cosA = max(dot(d, normalize(dirSol)), 0.0);
   cor += corSol * pow(cosA, tamanhoSol) * forcaSol;
   cor += corSol * pow(cosA, 3.0) * forcaSol * 0.16;
+
+  /* Nuvem. O céu era um degradê liso ocupando um terço do quadro — numa
+     Londres de chuva isso é o que mais entregava "cenário" em vez de céu.
+
+     A conta é a de sempre para nuvem barata: projeta a direção do olhar num
+     plano lá em cima e sorteia ruído nesse plano.
+
+     Duas medidas mandaram nos números aqui, e sem elas a nuvem simplesmente
+     não aparecia. A primeira: o jogo NUNCA olha para o alto — com a câmera
+     mirando 5° abaixo do horizonte e 54° de abertura vertical, o topo do
+     quadro fica a 22°, ou seja, todo o céu jogável cabe em h de 0 a 0,37.
+     Máscara que só abria em 0,30 deixava a nuvem numa tira invisível no topo.
+     A segunda: dividir por h joga a projeção para o infinito rente ao
+     horizonte, então o divisor leva um "+ 0,14". Isso mantém a perspectiva
+     (nuvem menor ao longe) sem a explosão que virava listra esticada — e de
+     quebra deixa a coordenada num intervalo em que o ruído tem célula
+     suficiente para desenhar forma. */
+  if (nuvens > 0.001) {
+    float mascara = smoothstep(0.004, 0.085, h);
+    vec2 plano = d.xz / (h + 0.14);
+    vec2 p = plano * nuvemEscala + nuvemVento * tempoCeu;
+    /* Normalizado, senão a cobertura pedida mente. As três oitavas somam no
+       máximo 0.875 e ficam em torno de 0.44, então um corte de 0.34 — que a
+       gente escreve pensando "66% de cobertura" — caía ABAIXO da média e
+       fechava o céu inteiro. Foi assim que a cena da chuva virou uma chapa
+       leitosa sem degradê nenhum. */
+    float n = fbmCeu(p) / 0.875;
+    float corte = 1.0 - nuvemCobertura;
+    /* Faixa estreita de propósito: o que faz ler como nuvem é a BORDA entre o
+       furo e o corpo. Rampa larga devolve o mesmo cinza médio em todo lugar,
+       que é neblina, não nuvem. */
+    float dens = smoothstep(corte, corte + 0.20, n) * mascara * nuvens;
+
+    /* Nuvem é vista POR BAIXO, e isso decide as cores: onde ela é fina a luz
+       atravessa e ela é clara; onde engrossa, a barriga fica pesada e escura.
+       (À noite inverte, e por isso a cor vem da fase: aí é o brilho da cidade
+       que acende justamente a barriga mais grossa.) */
+    vec3 corN = mix(corNuvemFina, corNuvemDensa, smoothstep(corte, corte + 0.34, n));
+    /* A borda fina é onde o sol atravessa, e é o que faz a nuvem parecer
+       fotografada em vez de pintada. Por isso o realce entra proporcional ao
+       que FALTA de densidade. */
+    corN += corSol * pow(cosA, 8.0) * forcaSol * 0.55 * (1.0 - dens);
+    cor = mix(cor, corN, dens);
+  }
 
   // banho de neblina perto do horizonte: é o que dá a Londres enevoada
   cor = mix(cor, corHorizonte, neblina * (1.0 - smoothstep(-0.05, 0.42, h)));
@@ -709,6 +810,13 @@ export function criarCeu(renderer, paleta) {
     tamanhoSol: { value: paleta.tamanhoSol ?? 160 },
     forcaSol: { value: paleta.forcaSol ?? 1 },
     neblina: { value: paleta.neblinaCeu ?? 0.35 },
+    nuvens: { value: paleta.nuvens ?? 0 },
+    nuvemCobertura: { value: paleta.nuvemCobertura ?? 0.5 },
+    nuvemEscala: { value: paleta.nuvemEscala ?? 0.09 },
+    nuvemVento: { value: new Vector2().fromArray(paleta.nuvemVento ?? [0.004, 0.0015]) },
+    corNuvemFina: { value: new Color(paleta.corNuvemFina ?? '#ffffff') },
+    corNuvemDensa: { value: new Color(paleta.corNuvemDensa ?? '#9aa3ad') },
+    tempoCeu: { value: 0 },
   };
 
   const malha = new Mesh(

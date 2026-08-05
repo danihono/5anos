@@ -84,10 +84,16 @@ export const FASES = [
        Com o céu fechado, as vitrines acesas e o asfalto molhado passam a
        recortar contra ele — que é o que faz esta ser a Londres chuvosa bonita
        em vez de uma folha em branco. */
+    /* A manta fechada da chuva. Cobertura alta e escala grande: são bancos
+       largos e pesados, quase sem furo, que é o céu que Londres tem quando
+       chove de verdade — e é contra ele que as vitrines acesas recortam. */
     paleta: {
       ceuAlto: '#5c7796', ceuHorizonte: '#9aa6ae', ceuBaixo: '#b3b6b2',
       corSol: '#e8e4d8', dirSol: [0.86, 0.24, -0.22], tamanhoSol: 130,
       forcaSol: 0.45, neblinaCeu: 0.32,
+      nuvens: 0.95, nuvemCobertura: 0.6, nuvemEscala: 0.5,
+      corNuvemFina: '#a7b2bd', corNuvemDensa: '#5d6b7a',
+      nuvemVento: [0.02, 0.006],
     },
     neblina: 0.0034,
     forcaHalo: 0.018,
@@ -95,7 +101,13 @@ export const FASES = [
     corSol: '#dfe6ee', forcaLuzSol: 1.15,
     corCeuLuz: '#93a8bf', corChaoLuz: '#8d8577', forcaHemisferio: 1.15,
     corPoste: '#ffc98a', forcaPoste: 16,
-    sombra: 0.35,
+    /* Medido, não chutado: com 0.35 — e mesmo com 0.62, que era o valor da
+       cena do parque — a sombra simplesmente NÃO APARECIA no quadro. A luz
+       hemisférica e o env map preenchem o que o sol tira, e a curva em S do
+       pós comprime o resto. Só perto de 1 a sombra volta a marcar o chão. Aqui
+       fica um pouco abaixo porque é dia de chuva: sol fraco espalha de
+       verdade. */
+    sombra: 0.72,
 
     chuva: 0.75, corChuva: '#d6e4f2', vento: [-1.2, 0],
     molhado: 0.9, pedra: false,
@@ -149,10 +161,16 @@ export const FASES = [
     velocidadeFinal: 16,
     cartas: [4, 5, 6, 7],
 
+    /* "A chuva passou": nuvem alta e rala, com muito azul entre uma e outra.
+       Cobertura baixa e escala fina fazem os flocos separados de tarde limpa —
+       e são eles que, na hora azul, seguram o último laranja do horizonte. */
     paleta: {
       ceuAlto: '#8ec2e8', ceuHorizonte: '#ffe7bb', ceuBaixo: '#f7d9a8',
       corSol: '#fff0cc', dirSol: [0.62, 0.22, 0.75], tamanhoSol: 200,
       forcaSol: 2.4, neblinaCeu: 0.34,
+      nuvens: 0.8, nuvemCobertura: 0.36, nuvemEscala: 0.8,
+      corNuvemFina: '#fff4e4', corNuvemDensa: '#d3b8ad',
+      nuvemVento: [0.012, 0.0035],
     },
     neblina: 0.0038,
     forcaHalo: 0,
@@ -164,7 +182,7 @@ export const FASES = [
     corSol: '#ffdfae', forcaLuzSol: 2.5,
     corCeuLuz: '#d2e6fa', corChaoLuz: '#b8a67c', forcaHemisferio: 1.25,
     corPoste: '#ffe2b4', forcaPoste: 4,
-    sombra: 0.62,
+    sombra: 0.95,
 
     /* O dia cai enquanto ela corre. Começa nesta tarde dourada e termina na
        hora azul, que é quando a London Eye acende — o Daniel pediu a roda à
@@ -200,6 +218,13 @@ export const FASES = [
       ceuAlto: '#080d26', ceuHorizonte: '#41263f', ceuBaixo: '#151129',
       corSol: '#ff8a4a', dirSol: [0.62, -0.015, 0.75], tamanhoSol: 260,
       forcaSol: 0.5, neblinaCeu: 0.14,
+      /* A nuvem some quase toda no escuro. Nuvem clara sobre céu de hora azul
+         vira mancha de leite: quem tem que aparecer aqui é a roda acesa. O
+         pouco que fica é escuro, com o laranja do horizonte pegando de raspão
+         na borda. */
+      nuvens: 0.68, nuvemCobertura: 0.42, nuvemEscala: 0.8,
+      corNuvemFina: '#3a2c45', corNuvemDensa: '#20182f',
+      nuvemVento: [0.012, 0.0035],
     },
     neblinaFim: 0.0044,
     /* A neblina do mundo tem cor própria no fim. Antes ela seguia
@@ -278,6 +303,13 @@ export const FASES = [
       ceuAlto: '#0d1b3e', ceuHorizonte: '#3c3a63', ceuBaixo: '#211f40',
       corSol: '#ffd7a8', dirSol: [0.45, 0.3, -0.6], tamanhoSol: 220,
       forcaSol: 1.2, neblinaCeu: 0.55,
+      /* Nuvem partida de noite de cidade: escura, mas com a barriga
+         alaranjada, que é o brilho de Londres batendo nela por baixo. Sem isso
+         o céu noturno fica um azul liso perfeito, que não existe em lugar
+         nenhum onde haja luz de rua. */
+      nuvens: 0.55, nuvemCobertura: 0.38, nuvemEscala: 0.62,
+      corNuvemFina: '#212a4c', corNuvemDensa: '#463451',
+      nuvemVento: [0.014, 0.004],
     },
     neblina: 0.004,
     forcaHalo: 0.03,
@@ -285,7 +317,7 @@ export const FASES = [
     corSol: '#b9c3ea', forcaLuzSol: 0.95,
     corCeuLuz: '#4a5c96', corChaoLuz: '#3e3442', forcaHemisferio: 0.88,
     corPoste: '#ffc070', forcaPoste: 24,
-    sombra: 0.5,
+    sombra: 0.85,
     /* A luz que acompanha ela. Existe desde o começo em jogo.js e nunca tinha
        sido ligada em fase nenhuma. Agora que ela veste couro preto, é o que
        impede a protagonista de virar uma silhueta perdida na rua noturna. */

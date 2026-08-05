@@ -34,6 +34,15 @@ O `index.html` é **gerado** — não edite ele à mão. As fontes estão em `js
 | `js/audio.js` | Todos os sons, sintetizados em WebAudio. Nenhum arquivo de áudio. |
 | `js/util.js` | Sorteio determinístico, presets de qualidade, `localStorage`. |
 
+Os três presets (`alto`, `medio`, `baixo`) são escolhidos medindo o aparelho —
+núcleos, memória e densidade de tela. Antes havia um `if (ehTatil())` na frente
+de tudo, e por causa dele **todo** celular caía no preset mais pobre, com um
+terço dos pixels da tela. Para poder levantar esse piso sem risco, o `jogo.js`
+tem um vigia: mede a mediana do tempo de quadro em janelas de 4 s (de tempo, não
+de contagem de quadros — num aparelho ruim 90 quadros levam um minuto e meio) e
+desce um degrau em silêncio se passar de 28 ms. Quem escolhe na pausa cala o
+vigia.
+
 Depois de editar, gere o `index.html`:
 
 ```bash
@@ -69,6 +78,46 @@ anel (o índice módulo N), dá para reencaixá-lo na janela certa em qualquer
 direção, num quadro. Isso arruma junto o `?dist=`, que antes precisava de uns
 10 s de recuperação antes de valer para tirar print — hoje vale já no primeiro
 quadro.
+
+## Quatro coisas que a imagem escondia
+
+O Daniel pediu mais realismo. Fui atrás do que estava segurando a imagem, e as
+quatro causas foram medidas — nenhuma delas era falta de detalhe no cenário.
+
+**O antialiasing não existia, e ligar a flag não resolveria.** O
+`new WebGLRenderer({ antialias: true })` não faz nada aqui: a cena inteira é
+desenhada dentro do alvo do `js/pos.js`, e para o framebuffer da tela só vai o
+quadrado do passe final — multiamostrar dois triângulos não suaviza aresta
+nenhuma. O antialiasing de verdade é o `samples` do `rtCena`, por preset. Num
+mundo feito de aresta reta era o maior "cheiro de brinquedo" que havia.
+
+**`PCFSoftShadowMap` morreu no three r185.** Ele aceita o valor, imprime aviso
+no console e desenha PCF comum. O substituto seria o VSM; tentei, e as capturas
+voltaram sem sombra nenhuma. Ficou PCF, e a qualidade veio de onde dá para
+medir: o frustum da sombra passou a vir do preset (`sombraExt`), mais fechado
+onde o mapa é menor — 512 texels espalhados nos 68 m de antes davam 7 por metro,
+o que é papa.
+
+**A sombra estava lá, mas invisível.** `shadow.intensity` a 0.35 — e mesmo a
+0.62 — não sobrevive à luz hemisférica, ao env map e à curva em S do pós: a
+menina corria sem tocar o chão. Só perto de 0.9 ela volta a marcar. É um número
+que só se acha comparando capturas com 0, com o valor atual e com 1.
+
+**Céu de degradê liso é um terço do quadro.** Agora tem nuvem, e duas medidas
+mandaram nos números: o jogo **nunca olha para cima** (a câmera mira 5° abaixo
+do horizonte e o topo do quadro fica a 22°, então todo o céu jogável cabe em
+`h` de 0 a 0,37 — máscara que abria em 0,30 deixava a nuvem numa tira
+invisível); e o ruído precisa ser normalizado, senão a "cobertura" mente e um
+corte escrito como 66% fecha o céu inteiro numa chapa leitosa.
+
+De brinde, a nuvem entra no env map — e foi ela que fez a ondulação da água
+aparecer. Perturbar a normal só rende quando existe alguma coisa para refletir;
+sobre um degradê liso, cada ângulo devolvia quase a mesma cor.
+
+O `build.py` agora passa o bundle pelo `node --check` antes de gravar. Uma crase
+dentro de um comentário que morava num shader fechou o template literal, o
+arquivo saiu com 1 MB feliz e a única pista era `Unexpected identifier 'd'` no
+console, com o jogo travado em "preparando Londres…".
 
 ## O Big Ben é copiado do de verdade
 
