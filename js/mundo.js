@@ -356,8 +356,30 @@ function fazPoste(corLuz, forcaHalo = 0.02) {
         uniforms: { cor: { value: new Color(corLuz) }, forca: { value: forcaHalo } },
         vertexShader: `varying float vY; void main(){ vY = uv.y;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+        /* O `clamp` antes do `pow` não é preciosismo — era ELE o quadrado preto.
+
+           `pow(x, y)` com x negativo é INDEFINIDO em GLSL, e a maioria das
+           placas devolve NaN. O `vY` vem interpolado da uv do cone, e basta um
+           fio de imprecisão para chegar aqui como -1e-7. O NaN sai daqui pelo
+           alfa, a mistura aditiva o joga no alvo HDR, e aí ele deixa de ser um
+           pixel: o borrão separável do bloom espalha NaN por toda a vizinhança
+           que ele toca, e no passe final o ACES devolve zero. O resultado é um
+           RETÂNGULO PRETO chapado, do tamanho do borrão.
+
+           Isso explica cada peça do que a Isadora relatou, e por isso demorou
+           tanto para ser achado:
+
+           · Só na primeira e na terceira cena. `forcaHalo` é 0,018 e 0,03 nas
+             ruas e ZERO no parque — sem halo, sem NaN.
+           · "Quanto maior o gráfico, maiores os quadrados." Mais níveis de
+             bloom, borrão mais grosso, retângulo maior.
+           · Sumia com `?sem=pos`: sem bloom o NaN não se espalha.
+           · Sumia com `?sem=predios`: o poste mora nos blocos.
+           · Ficava com `?sem=texturas`: não tinha nada a ver com textura.
+           · E nunca apareceu em nenhuma das minhas varreduras porque aqui o
+             renderizador é por software, e software não devolve NaN nesse pow. */
         fragmentShader: `varying float vY; uniform vec3 cor; uniform float forca;
-          void main(){ gl_FragColor = vec4(cor, pow(vY, 2.2) * forca); }`,
+          void main(){ gl_FragColor = vec4(cor, pow(clamp(vY, 0.0, 1.0), 2.2) * forca); }`,
       })
     );
     halo.position.set(0, 2.3, 0.5);

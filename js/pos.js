@@ -24,6 +24,14 @@ uniform sampler2D tDiffuse;
 uniform float limiar, joelho;
 void main(){
   vec3 c = texture2D(tDiffuse, vUv).rgb;
+  /* Rede de segurança contra NaN, e ela é barata perto do que custa não ter.
+     Um único pixel NaN entrando aqui não fica sendo um pixel: o borrão
+     separável logo abaixo o espalha por toda a vizinhança que toca, e o passe
+     final devolve zero — ou seja, um retângulo preto chapado do tamanho do
+     borrão. Foi exatamente assim que o halo do poste (que já foi consertado na
+     fonte) virou os quadrados pretos que a Isadora via. Aqui o NaN morre antes
+     de contaminar o resto. */
+  if (!all(equal(c, c))) c = vec3(0.0);
   float b = max(c.r, max(c.g, c.b));
   float macio = clamp(b - limiar + joelho, 0.0, 2.0 * joelho);
   macio = macio * macio / (4.0 * joelho + 0.0001);
