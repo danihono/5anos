@@ -6932,6 +6932,21 @@ function iniciar() {
   if (ehTatil()) document.body.classList.add('tatil');
   if (location.hash === '#debug') document.body.classList.add('debug');
 
+  /* `?sem=sombra,chuva` desliga subsistemas inteiros, um de cada vez.
+
+     Existe por um motivo específico: a Isadora vê retângulos pretos na tela e eu
+     não consigo reproduzir em máquina nenhuma minha — varri as cenas 1 e 3
+     inteiras, em pé e deitado, com a qualidade travada em baixo e em médio, e
+     não apareceu uma vez sequer. A máquina dela é a única que reproduz, então
+     quem precisa conseguir bissectar é ela, e não eu. Com isto ela abre quatro
+     endereços e diz em qual a tela limpa.
+
+     Sem o parâmetro nada muda — mesmo espírito do `?fase=` e do `?dist=`. */
+  const SEM = new Set(
+    (new URLSearchParams(location.search).get('sem') || '')
+      .split(',').map((s) => s.trim()).filter(Boolean));
+  if (SEM.size) console.info('[5anos] diagnóstico — desligado:', [...SEM].join(', '));
+
   /* ─────────── renderizador ─────────── */
   let qualidade = memoria.ler('qualidade', qualidadeAutomatica());
   if (!PRESETS[qualidade]) qualidade = 'medio';
@@ -6953,7 +6968,7 @@ function iniciar() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, preset.pixelRatio));
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = NoToneMapping;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !SEM.has('sombra');
   /* PCF, e há um caminho fechado atrás desta linha que vale registrar.
 
      Para amaciar a borda o óbvio seria `PCFSoftShadowMap` — mas ele foi
@@ -7234,7 +7249,25 @@ function iniciar() {
     luzHeroi.visible = !!fase.luzHeroi;
 
     Som.ambiente(fase.som);
+    aplicarDiagnostico();
     await respirar('acendendo os postes…', 0.9);
+  }
+
+  /* Aplica o `?sem=` no mundo recém-montado. Vai no fim de cada `carregarFase`
+     porque o `mundo` é desmontado e refeito a cada troca de cena. */
+  function aplicarDiagnostico() {
+    if (!SEM.size || !mundo) return;
+    if (SEM.has('chuva') && mundo.chuva) mundo.chuva.objeto.visible = false;
+    if (SEM.has('predios')) {
+      for (const b of mundo.blocos) b.grupo.visible = false;
+    }
+    if (SEM.has('ceu') && mundo.ceu) mundo.ceu.malha.visible = false;
+    const u = pos.uniforms;
+    if (SEM.has('dof')) u.forcaDof.value = 0;
+    if (SEM.has('bloom')) u.forcaBloom.value = 0;
+    if (SEM.has('gotas')) u.gotas.value = 0;
+    if (SEM.has('grao')) u.grao.value = 0;
+    if (SEM.has('vinheta')) u.vinheta.value = 0;
   }
 
   /** Cede o controle para o navegador desenhar a barra de carregamento. */
@@ -8115,7 +8148,14 @@ function iniciar() {
     const u = pos.uniforms;
     u.flash.value = estado.flash * 0.5;
     u.velocidade.value = estado.velocidade;
-    pos.render(dt);
+    if (SEM.has('pos')) {
+      // sem passe nenhum de pós: a cena crua direto na tela. Fica lavada (o
+      // tonemap mora no passe final), mas serve para dizer se o preto vem de lá
+      renderer.setRenderTarget(null);
+      renderer.render(cena, camera);
+    } else {
+      pos.render(dt);
+    }
 
     vigiarQuadro(dtReal * 1000);
 
