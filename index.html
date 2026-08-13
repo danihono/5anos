@@ -3001,9 +3001,19 @@ function poca() {
   const g = new Group();
   const disco = new Mesh(
     geo('poca', () => new CircleGeometry(0.75, 20)),
+    /* Mesma armadilha do envidraçado do ônibus, e pelo mesmo motivo: `#0a0e14`
+       com aspereza 0,02 é espelho sobre quase-preto, e espelho só tem a cor do
+       que está em volta. Onde há céu em cima ela fica linda; onde não há — na
+       cena da noite, embaixo de marquise, encostada num ônibus — ela não tem
+       cor NENHUMA para mostrar e vira um buraco recortado no asfalto.
+
+       Continua poça: espelhada o bastante para devolver o poste e a vitrine. O
+       que muda é ter chão próprio — uma cor de água escura de verdade e uma
+       emissiva mínima — para o pior caso ser "água escura" e não "buraco". */
     mat('agua', () => new MeshPhysicalMaterial({
-      color: new Color('#0a0e14'), roughness: 0.02, metalness: 0.0,
-      transmission: 0, clearcoat: 1, clearcoatRoughness: 0.02, side: DoubleSide,
+      color: new Color('#1d2836'), roughness: 0.07, metalness: 0.0,
+      transmission: 0, clearcoat: 1, clearcoatRoughness: 0.04, side: DoubleSide,
+      emissive: new Color('#141d28'), emissiveIntensity: 0.35,
     }))
   );
   disco.rotation.x = -Math.PI / 2;
