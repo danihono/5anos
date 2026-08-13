@@ -6952,7 +6952,27 @@ function iniciar() {
   const SEM = new Set(
     (new URLSearchParams(location.search).get('sem') || '')
       .split(',').map((s) => s.trim()).filter(Boolean));
-  if (SEM.size) console.info('[5anos] diagnóstico — desligado:', [...SEM].join(', '));
+  /* Selo visível de diagnóstico, e ele existe por um motivo prático.
+
+     A Isadora testou `?sem=tudo` e disse "ainda tem coisa" — mas `?sem=tudo`
+     esconde a cena inteira, então "ainda tem coisa" quase certamente quer dizer
+     que a página dela nem chegou a receber essa versão (GitHub Pages leva alguns
+     minutos, e o navegador ainda guarda cache). Sem uma confirmação na tela, não
+     dá para distinguir "a chave não resolveu" de "a chave não chegou" — e essas
+     duas conclusões mandam a caça para lados opostos.
+
+     Com o selo, cada teste passa a se autoconferir: se ela abre com `?sem=` e
+     não vê o selo, é build velho e o resultado não vale. */
+  if (SEM.size) {
+    console.info('[5anos] diagnóstico — desligado:', [...SEM].join(', '));
+    const selo = document.createElement('div');
+    selo.textContent = 'DIAGNÓSTICO · sem ' + [...SEM].join(' + ');
+    selo.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99;'
+      + 'font:11px/1.4 monospace;letter-spacing:.08em;color:#0b0b0d;background:#ffd34d;'
+      + 'padding:5px 9px;border-radius:2px;pointer-events:none;white-space:pre';
+    addEventListener('DOMContentLoaded', () => document.body.appendChild(selo));
+    if (document.body) document.body.appendChild(selo);
+  }
 
   /* ─────────── renderizador ─────────── */
   let qualidade = memoria.ler('qualidade', qualidadeAutomatica());
