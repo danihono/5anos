@@ -137,7 +137,11 @@ export const FASES = [
            fechado que os 54 de base — aqui o marco é largo, então precisa de
            aproximação e não de espaço vertical. */
         olhada: { de: 360, ate: 500, fov: 50, recuo: 12, subida: 1.6,
-                  mira: [24, 14, 498], dofPerto: 120, dofLonge: 480 } },
+                  mira: [24, 14, 498], dofPerto: 120, dofLonge: 480 },
+        /* A praça é larga e rasa: a caixa envolvente sozinha põe a câmera longe
+           demais e a fachada some. O raio fixo aproxima até os telões voltarem
+           a ser legíveis. */
+        voo: { raio: 62, altura: 24 } },
 
       /* ── os ônibus da linha 1D ──────────────────────────────────────────
          Cinco ônibus, cinco cidades: Holmes Chapel, Doncaster, Bradford,
@@ -156,9 +160,12 @@ export const FASES = [
 
          Três nesta cena, dois na cena da agência. Fora da clareira do
          Piccadilly (376 a 556) para não pousarem dentro da praça. */
-      { tipo: 'onibus', x: 4.2, z: 176, destino: 'HOLMES CHAPEL' },
-      { tipo: 'onibus', x: -4.2, z: 288, rot: Math.PI, destino: 'DONCASTER' },
-      { tipo: 'onibus', x: 4.2, z: 654, destino: 'BRADFORD' },
+      { tipo: 'onibus', x: 4.2, z: 176, destino: 'HOLMES CHAPEL',
+        voo: { nome: 'Linha 1D · Holmes Chapel', legenda: 'Cheshire, 250 km ao norte daqui.' } },
+      { tipo: 'onibus', x: -4.2, z: 288, rot: Math.PI, destino: 'DONCASTER',
+        voo: { nome: 'Linha 1D · Doncaster', legenda: 'South Yorkshire, subindo a ilha.' } },
+      { tipo: 'onibus', x: 4.2, z: 654, destino: 'BRADFORD',
+        voo: { nome: 'Linha 1D · Bradford', legenda: 'West Yorkshire, mais ao norte ainda.' } },
     ],
 
     padroes: PADROES_RUA,
@@ -277,7 +284,12 @@ export const FASES = [
       { tipo: 'coreto', x: 14, z: 118, escala: 1,
         nome: 'O coreto',
         legenda: 'Alguém tocava aqui nos domingos. Hoje é só o vento.',
-        aviso: 55 },
+        aviso: 55,
+        /* O coreto tem 8 m e está no meio do bosque: a conta automática põe a
+           câmera a 9 m de altura, ou seja, DENTRO das árvores — e a primeira
+           imagem era uma copa amarela ocupando a tela inteira. Aqui o sobrevoo
+           é sobrevoo mesmo: por cima da copa, olhando para baixo. */
+        voo: { raio: 24, altura: 19 } },
 
       /* A London Eye em balanço sobre o lago, com o pé na margem de lá (a água
          vai de x=-58 a x=-11). Antes ela era menor e ficava a x=-40: a menina
@@ -294,7 +306,8 @@ export const FASES = [
         legenda: 'A roda parada no alto, como quem também não quer que acabe.',
         aviso: 145,
         olhada: { de: 330, ate: 440, fov: 70, recuo: 18, subida: 1.2,
-                  mira: [-60, 36, 470], dofPerto: 130, dofLonge: 520 } },
+                  mira: [-60, 36, 470], dofPerto: 130, dofLonge: 520 },
+        voo: {} },
     ],
 
     padroes: PADROES_PARQUE,
@@ -375,7 +388,9 @@ export const FASES = [
       /* O Palácio corre para o sul a partir da torre, como o de verdade. Bem
          afastado da rua: a 34 m ele entrava no quadro pelo canto direito como
          um paredão preto de 19 m quando ela passava ao lado. */
-      { tipo: 'parlamento', x: -52, z: 450, rot: Math.PI / 2, escala: 0.72, noturno: true },
+      { tipo: 'parlamento', x: -52, z: 450, rot: Math.PI / 2, escala: 0.72, noturno: true,
+        voo: { nome: 'Palácio de Westminster',
+               legenda: 'A casa ao lado da torre, correndo para o sul pela margem.' } },
 
       /* A clareira é do Big Ben, não do Parlamento: precisa começar ANTES da
          janela da olhada, senão a última casa da fileira tapa a torre bem na
@@ -395,23 +410,32 @@ export const FASES = [
            O desfoque de fundo também abre: com dofLonge de 120 m a torre
            virava mancha justamente aqui. */
         olhada: { de: 118, ate: 240, fov: 70, recuo: 14, subida: 1.2,
-                  mira: [-30, 38, 330], dofPerto: 170, dofLonge: 620 } },
+                  mira: [-30, 38, 330], dofPerto: 170, dofLonge: 620 },
+        voo: {} },
 
       { tipo: 'ponte', x: 0, z: 620, escala: 1, claro: 176, lado: 0, piso: 'agua',
         // a travessia é um momento, não um teste: nada de obstáculo em cima da ponte
         limpo: 62,
         nome: 'Tower Bridge',
-        legenda: 'Do outro lado do rio já dá para ver a agência.', aviso: 110 },
+        legenda: 'Do outro lado do rio já dá para ver a agência.', aviso: 110,
+        /* As duas torres estão separadas no eixo X, então o ângulo de partida
+           dos outros — que olha quase ao longo do X — punha uma exatamente
+           atrás da outra. Vendo de montante, as duas aparecem com o vão no
+           meio, que é o desenho que faz a ponte ser essa ponte. */
+        voo: { angulo: -0.55 } },
 
       // os dois últimos da linha 1D, já depois da ponte (que ocupa 532 a 708)
-      { tipo: 'onibus', x: -4.2, z: 748, rot: Math.PI, destino: 'MULLINGAR' },
-      { tipo: 'onibus', x: 4.2, z: 892, destino: 'WOLVERHAMPTON' },
+      { tipo: 'onibus', x: -4.2, z: 748, rot: Math.PI, destino: 'MULLINGAR',
+        voo: { nome: 'Linha 1D · Mullingar', legenda: 'No meio da Irlanda, atravessando o mar.' } },
+      { tipo: 'onibus', x: 4.2, z: 892, destino: 'WOLVERHAMPTON',
+        voo: { nome: 'Linha 1D · Wolverhampton', legenda: 'West Midlands, quase no centro da ilha.' } },
 
       /* A loja de discos, na reta final. Encostada na fileira de casas
          (a fachada fica em x = 9) e virada para a rua: `x = 8.4` deixa a
          vitrine 60 cm à frente da parede, sem furar o quarteirão. x positivo é
          a ESQUERDA da tela. */
-      { tipo: 'discos', x: 8.4, z: 806, rot: -Math.PI / 2 },
+      { tipo: 'discos', x: 8.4, z: 806, rot: -Math.PI / 2,
+        voo: { nome: 'A loja de discos', legenda: 'Vitrine acesa na reta final, com um cartaz na janela.' } },
     ],
     corRio: '#2c6b80',
 
@@ -436,6 +460,35 @@ export const FASES = [
            ] },
   },
 ];
+
+/* ── a visita aos monumentos ────────────────────────────────────────────────
+   Quem não quiser correr — ou quem já correu — pode ver de perto o que a
+   corrida só deixa passar de relance. A lista sai dos PRÓPRIOS pontos das
+   cenas: quem tiver um `voo` entra na visita, na ordem em que já está escrito
+   aqui (por cena e, dentro dela, pela ordem do arquivo).
+
+   O nome e a legenda da ficha ficam DENTRO do `voo`, e não no ponto, de
+   propósito. `nome`/`legenda` no ponto são o recado que aparece durante a
+   corrida (`criarPontos` só entra na lista de marcos quem tem um dos dois), e
+   o Parlamento, os ônibus e a loja de discos não têm recado nenhum de caso
+   pensado — são para ser notados, não anunciados. Escrever a ficha aqui dá
+   nome a eles na visita sem inventar legenda nova no meio da corrida.
+   ───────────────────────────────────────────────────────────────────────── */
+export function listaDeMonumentos() {
+  const fora = [];
+  FASES.forEach((f, i) => {
+    for (const p of (f.pontos || [])) {
+      if (!p.voo) continue;
+      fora.push({
+        fase: i,
+        ponto: p,
+        nome: p.voo.nome || p.nome || '',
+        legenda: p.voo.legenda || p.legenda || '',
+      });
+    }
+  });
+  return fora;
+}
 
 /* ── geração do trajeto ─────────────────────────────────────────────────── */
 

@@ -286,8 +286,26 @@ function letreiro(destino) {
 function onibus(destino) {
   const g = new Group();
   const matVermelho = mat('onibusVermelho', () => padrao('#9c2233', { roughness: 0.42, metalness: 0.25 }));
+  /* O envidraçado do ônibus, e o motivo de ele ter sido refeito.
+
+     A primeira versão era um espelho: `#0e1418` com aspereza 0,08 e verniz 1.
+     Espelho não tem cor própria — ele devolve o que está em volta. De dia, com
+     o céu inteiro em cima, isso dava o cinza-prata bonito de vidro de ônibus.
+     À noite, e em qualquer ângulo que apontasse para o escuro, não havia nada
+     para devolver: as duas faixas de janela viravam UM RETÂNGULO PRETO CHAPADO,
+     de aresta dura, que a Isadora via como um quadrado preto colado no ônibus.
+     E como ônibus só existe nas duas cenas de rua — o parque não tem nenhum —
+     o defeito aparecia na primeira e na última cena e não na do meio, que foi
+     exatamente o que ela descreveu.
+
+     O conserto é tirar o espelho, não escurecer mais nem clarear: aspereza de
+     verdade (0,34), vidro azulado com cor PRÓPRIA e uma emissiva mínima. Assim
+     ele continua sendo vidro escuro de dia e vira vidro escuro à noite, em vez
+     de virar buraco. */
   const matVidro = mat('vidroOnibus', () => new MeshPhysicalMaterial({
-    color: new Color('#0e1418'), roughness: 0.08, metalness: 0.1, clearcoat: 1,
+    color: new Color('#28323d'), roughness: 0.34, metalness: 0.1,
+    clearcoat: 1, clearcoatRoughness: 0.28,
+    emissive: new Color('#212d38'), emissiveIntensity: 0.5,
   }));
   const corpo = new Mesh(geo('onibusCorpo', () => new BoxGeometry(2.5, 4.1, 10.5)), matVermelho);
   corpo.position.y = 2.35;

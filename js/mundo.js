@@ -632,7 +632,7 @@ function fazPisoDaClareira(p, fase) {
   return g;
 }
 
-function criarPontos(fase, alvo, preset, telas = [], acendiveis = []) {
+function criarPontos(fase, alvo, preset, telas = [], acendiveis = [], voos = []) {
   const lista = [];
   for (const p of (fase.pontos || [])) {
     let obj = null;
@@ -657,6 +657,13 @@ function criarPontos(fase, alvo, preset, telas = [], acendiveis = []) {
     obj.scale.setScalar(p.escala || 1);
     alvo.add(obj);
     alvo.add(fazPisoDaClareira(p, fase));
+
+    /* Quem entra na visita guiada entrega o objeto montado junto. O
+       enquadramento do sobrevoo sai da caixa envolvente REAL de cada um, medida
+       depois de posicionado e escalado — é o que evita ter doze raios chutados
+       à mão aqui e no `fases.js`, e o que faz um ônibus e a London Eye caberem
+       na tela com a mesma conta. */
+    if (p.voo) voos.push({ ponto: p, objeto: obj });
 
     if (p.legenda || p.olhada) {
       lista.push({
@@ -2507,7 +2514,8 @@ export function criarMundo(cena, renderer, fase, preset) {
   grupo.add(pontosGrupo);
   const telas = [];
   const acendiveis = [];
-  const pontos = criarPontos(fase, pontosGrupo, preset, telas, acendiveis);
+  const voos = [];
+  const pontos = criarPontos(fase, pontosGrupo, preset, telas, acendiveis, voos);
 
   /* Última água já criada (o chão e os pisos das clareiras), então dá para
      guardar a lista desta fase e soltar o registro compartilhado. */
@@ -2758,5 +2766,5 @@ export function criarMundo(cena, renderer, fase, preset) {
     cena.environment = null;
   }
 
-  return { grupo, atualizar, dispose, ajustarSombra, sol, ceu, blocos, chuva, pontos };
+  return { grupo, atualizar, dispose, ajustarSombra, sol, ceu, blocos, chuva, pontos, voos };
 }

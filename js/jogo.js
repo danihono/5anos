@@ -7,7 +7,7 @@
    para as cartas.
    ═══════════════════════════════════════ */
 
-import { WebGLRenderer, Scene, PerspectiveCamera, Vector3, PCFShadowMap,
+import { WebGLRenderer, Scene, PerspectiveCamera, Vector3, PCFShadowMap, Box3,
          SRGBColorSpace, NoToneMapping, Group, PointLight, Color } from 'three';
 import { $, limita, mistura, amortece, suaveEntre, sorteio, qualidadeAutomatica, PRESETS,
          ESCADA_QUALIDADE, ehTatil, menosMovimento, memoria } from './util.js';
@@ -16,7 +16,8 @@ import { criarPos } from './pos.js';
 import { criarMenina } from './personagem.js';
 import { criarObstaculo, COMO_PASSAR } from './obstaculos.js';
 import { criarMundo, criarAgencia } from './mundo.js';
-import { FASES, CARTAS, gerarTrajeto, validarTrajeto, posicaoDaFaixa } from './fases.js';
+import { FASES, CARTAS, gerarTrajeto, validarTrajeto, posicaoDaFaixa,
+         listaDeMonumentos } from './fases.js';
 
 /* 60 Hz de lógica com teto de 8 passos por quadro tolera queda até ~7 fps
    antes de entrar em câmera lenta. A 120 Hz o teto batia já abaixo de 15 fps,
@@ -252,6 +253,14 @@ export function iniciar() {
   addEventListener('keydown', (e) => {
     if (e.repeat) return;
     teclas[e.code] = true;
+    /* Na visita, as mesmas setas trocam de monumento em vez de trocar de faixa,
+       e o Esc devolve a abertura em vez de abrir a pausa. Sai antes de tudo. */
+    if (estado.modo === 'monumentos') {
+      if (['ArrowLeft', 'KeyA'].includes(e.code)) irParaMonumento(monAtual - 1);
+      if (['ArrowRight', 'KeyD'].includes(e.code)) irParaMonumento(monAtual + 1);
+      if (e.code === 'Escape') fecharMonumentos(() => { elIntro.hidden = false; });
+      return;
+    }
     if (['ArrowLeft', 'KeyA'].includes(e.code)) trocarFaixa(-1);
     if (['ArrowRight', 'KeyD'].includes(e.code)) trocarFaixa(1);
     if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { pular(); e.preventDefault(); }
@@ -785,6 +794,11 @@ export function iniciar() {
   }
 
   function atualizarCamera(dt) {
+    if (estado.modo === 'monumentos') {
+      camaraDeVoo(dt);
+      return;
+    }
+
     if (estado.modo === 'final' && estado.tempoModo > 0.4) {
       // a câmera dá a volta e enquadra a fachada
       const t = suaveEntre(0.4, 5.2, estado.tempoModo);
@@ -856,6 +870,275 @@ export function iniciar() {
     camera.position.set(px, py, pz);
     camera.lookAt(alvoOlhar);
   }
+
+  /* ─────────── a visita aos monumentos ───────────
+     Uma terceira porta na abertura, para quem não quiser correr (ou já tiver
+     corrido) e mesmo assim quiser ver de perto o que a corrida só deixa passar.
+     A cidade é a mesma: nada é construído de novo aqui. O que muda é que a
+     câmera larga as costas dela e passa a dar voltas em volta de um marco.
+
+     A conta do enquadramento sai da CAIXA ENVOLVENTE real de cada objeto, medida
+     depois de posicionado e escalado (`mundo.voos`, montado em `criarPontos`).
+     Foi a forma de a mesma linha servir para um ônibus de 10 m e para a London
+     Eye de 80: doze raios escritos à mão em `fases.js` seriam doze chances de
+     errar, e todos precisariam ser refeitos a cada mudança de escala. */
+
+  const MONUMENTOS = listaDeMonumentos();
+  const elMon = $('#monumentos');
+  const elMonTitulo = $('#mon-titulo');
+  const elMonFita = $('#mon-fita');
+  const elMonDica = $('#mon-dica');
+  const VOLTA_AUTO = 0.09;          // rad/s do sobrevoo sozinho
+  const ESPERA_AUTO = 2.2;          // s parada antes de o giro voltar
+
+  let monAtual = -1;
+  let monVoo = null;                // { mira:Vector3, raio, altura, fov }
+  let monAngulo = 0;
+  let monRaio = 40;
+  let monAltura = 12;
+  let monParado = 0;                // tempo desde o último arrastar
+  let monTrocando = false;
+  const monMira = new Vector3();
+
+  /** Enquadramento de um marco, medido da caixa envolvente dele. */
+  function medirVoo(objeto, ponto) {
+    const caixa = new Box3().setFromObject(objeto);
+    const tam = caixa.getSize(new Vector3());
+    const centro = caixa.getCenter(new Vector3());
+    const v = ponto.voo || {};
+
+    /* Mirar no centro geométrico deixa metade do quadro no chão em coisa alta e
+       fina — a torre do Big Ben tem 96 m de altura para 12 de base. Descer um
+       pouco a mira põe o pé do marco no quadro junto com o topo. */
+    const mira = new Vector3(centro.x, caixa.min.y + tam.y * 0.42, centro.z);
+
+    /* Raio: a metade da maior medida horizontal, mais o que a altura pede, mais
+       uma folga. O `0.55` da altura é o que faz a torre caber em pé sem a câmera
+       ter de subir junto — foi medido olhando, não deduzido. */
+    const largo = Math.max(tam.x, tam.z);
+    const raio = v.raio ?? (largo * 0.62 + tam.y * 0.55 + 9);
+    const altura = v.altura ?? (mira.y + tam.y * 0.30 + 3.5);
+
+    /* Quem mora DENTRO da rua — os ônibus e a loja de discos — tem um problema
+       que os marcos grandes não têm: a fileira de casas está a 9 m do eixo, e
+       uma órbita de 18 m enfia a câmera dentro da parede da frente. Metade da
+       volta virava um bloco chapado ocupando a tela.
+
+       A saída não é encolher a órbita (a 4 m de um ônibus não se lê nada): é
+       SUBIR quando a volta passa da fachada, e é o que um drone faria mesmo —
+       sobe, passa por cima do telhado e desce do outro lado. Marco com clareira
+       (Big Ben, ponte, Piccadilly) não entra nisso: ali a fileira já foi
+       aberta e não há parede nenhuma para bater. */
+    const canyon = fase.tipo === 'rua' && !ponto.claro && Math.abs(mira.x) < 9;
+
+    return { mira, raio, altura, fov: v.fov ?? 58, canyon, angulo: v.angulo,
+             raioMin: raio * 0.45, raioMax: raio * 2.4 };
+  }
+
+  function desenharFita() {
+    elMonFita.innerHTML = '';
+    MONUMENTOS.forEach((m, i) => {
+      const b = document.createElement('button');
+      b.textContent = m.nome;
+      b.className = i === monAtual ? 'atual' : '';
+      b.onclick = () => irParaMonumento(i);
+      elMonFita.appendChild(b);
+    });
+    const atual = elMonFita.children[monAtual];
+    if (atual) atual.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
+
+  async function irParaMonumento(i) {
+    if (monTrocando) return;
+    const alvo = (i + MONUMENTOS.length) % MONUMENTOS.length;
+    const m = MONUMENTOS[alvo];
+    monTrocando = true;
+    try {
+      if (m.fase !== estado.faseIndice) {
+        /* Trocar de cena é desmontar e remontar Londres inteira: os segundos de
+           "carregando" são os mesmos da troca de cena da corrida. A lista está
+           em ordem de cena justamente para isso ser raro. */
+        elCarregando.hidden = false;
+        await carregarFase(m.fase);
+        elCarregando.hidden = true;
+      }
+      monAtual = alvo;
+
+      const achado = (mundo.voos || []).find((v) => v.ponto === m.ponto);
+      monVoo = achado ? medirVoo(achado.objeto, m.ponto) : null;
+      if (monVoo) {
+        monMira.copy(monVoo.mira);
+        monRaio = monVoo.raio;
+        monAltura = monVoo.altura;
+      }
+      /* Começa de trás e de lado, e não de frente: de frente a primeira imagem
+         é a fachada chapada, sem volume nenhum. Na rua o ângulo é outro — ali a
+         primeira imagem tem que estar SOBRE O ASFALTO, que é de onde o anúncio
+         da lateral do ônibus e a vitrine da loja se leem. */
+      monAngulo = monVoo && monVoo.angulo != null ? monVoo.angulo
+        : monVoo && monVoo.canyon
+          ? Math.asin(limita(-monMira.x / Math.max(monRaio, 1), -1, 1)) - 0.35
+          : -2.2;
+      monParado = ESPERA_AUTO;
+
+      /* O mundo recicla os quarteirões pela distância dela, e a cena do parque
+         interpola o anoitecer por ela também. Pondo `dist` no z do marco, a
+         cidade se monta em volta dele e a hora do dia é a que ele teria. */
+      estado.dist = monMira.z;
+      estado.x = 0;
+      menina.raiz.position.set(0, -50, monMira.z);
+
+      /* O desfoque de fundo é feito para a rua e apagaria justamente o que se
+         veio ver — a mesma armadilha da `olhada`. Aqui ele sai de vez. */
+      pos.uniforms.forcaDof.value = 0;
+
+      elMonTitulo.querySelector('.n').textContent = m.nome;
+      elMonTitulo.querySelector('.l').textContent = m.legenda;
+      desenharFita();
+      atualizarCamera(0);
+      mundo.atualizar(0, estado.dist, camera.position);
+    } finally {
+      monTrocando = false;
+    }
+  }
+
+  function camaraDeVoo(dt) {
+    if (!monVoo) return;
+    monParado += dt;
+    if (monParado >= ESPERA_AUTO) {
+      monAngulo += VOLTA_AUTO * dt * (menosMovimento() ? 0.35 : 1);
+    }
+    let alt = Math.max(monMira.y + 1.5, monAltura);
+    const cx = monMira.x + Math.sin(monAngulo) * monRaio;
+    const cz = monMira.z + Math.cos(monAngulo) * monRaio;
+    if (monVoo.canyon) {
+      // sobe por cima da fileira quando a volta passa da fachada (x = ±9);
+      // 6 m de rampa para a subida ser um voo e não um salto
+      // 26 m passa dos 20,4 do prédio mais alto (6 andares de 3,4)
+      const excesso = Math.abs(cx) - 8.2;
+      if (excesso > 0) alt = mistura(alt, Math.max(alt, 26), suaveEntre(0, 2.5, excesso));
+    }
+    camera.position.set(cx, alt, cz);
+    alvoOlhar.copy(monMira);
+    camera.lookAt(alvoOlhar);
+
+    const fovAlvo = fovVertical(monVoo.fov, camera.aspect);
+    if (Math.abs(fovAlvo - fovAtual) > 0.01) {
+      fovAtual = fovAlvo;
+      camera.fov = fovAtual;
+      camera.updateProjectionMatrix();
+    }
+  }
+
+  /* ── controles do sobrevoo ──
+     Registrados na camada e não na janela: durante a corrida esses mesmos
+     gestos são o comando dela, e roubar o `pointerdown` global quebraria o
+     jogo. Fora do modo `monumentos` nada aqui chega a rodar. */
+  let arrastando = false, arrastouX = 0, arrastouY = 0;
+
+  elMon.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button, a')) return;
+    arrastando = true;
+    arrastouX = e.clientX;
+    arrastouY = e.clientY;
+    elMon.classList.add('arrastando');
+    elMon.setPointerCapture(e.pointerId);
+  });
+  elMon.addEventListener('pointermove', (e) => {
+    if (!arrastando || !monVoo) return;
+    monAngulo -= (e.clientX - arrastouX) * 0.006;
+    monAltura = limita(monAltura - (e.clientY - arrastouY) * 0.09,
+                       monMira.y - monVoo.raio * 0.25, monMira.y + monVoo.raio * 1.1);
+    arrastouX = e.clientX;
+    arrastouY = e.clientY;
+    monParado = 0;
+  });
+  /* `pointerleave` NÃO entra aqui: com a captura ligada o navegador já garante
+     que o `pointerup` chega nesta camada mesmo se o dedo sair da janela, e o
+     `leave` chega junto com a captura em alguns navegadores — matando o
+     arrastar no primeiro pixel. */
+  for (const ev of ['pointerup', 'pointercancel']) {
+    elMon.addEventListener(ev, () => { arrastando = false; elMon.classList.remove('arrastando'); });
+  }
+  elMon.addEventListener('wheel', (e) => {
+    if (!monVoo) return;
+    e.preventDefault();
+    monRaio = limita(monRaio * (1 + Math.sign(e.deltaY) * 0.09), monVoo.raioMin, monVoo.raioMax);
+    monParado = 0;
+  }, { passive: false });
+
+  /* Pinça no celular: duas contas de distância entre os dedos, sem biblioteca. */
+  const dedos = new Map();
+  let pincaAntes = 0;
+  elMon.addEventListener('pointerdown', (e) => dedos.set(e.pointerId, e));
+  elMon.addEventListener('pointermove', (e) => {
+    if (!dedos.has(e.pointerId)) return;
+    dedos.set(e.pointerId, e);
+    if (dedos.size !== 2 || !monVoo) return;
+    arrastando = false;
+    const [a, b] = [...dedos.values()];
+    const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (pincaAntes) {
+      monRaio = limita(monRaio * (pincaAntes / d), monVoo.raioMin, monVoo.raioMax);
+      monParado = 0;
+    }
+    pincaAntes = d;
+  });
+  for (const ev of ['pointerup', 'pointercancel']) {
+    elMon.addEventListener(ev, (e) => { dedos.delete(e.pointerId); if (dedos.size < 2) pincaAntes = 0; });
+  }
+
+  async function abrirMonumentos() {
+    /* Mesmo gesto que o "começar": é aqui que o navegador libera o áudio, e a
+       música tem que atravessar a visita e a corrida sem recomeçar. */
+    Som.iniciar();
+    Som.retomar();
+    Som.musica(MUSICA_DE_FUNDO, { volume: 0.42 });
+    Som.ambiente(fase.som);
+
+    elIntro.hidden = true;
+    elMon.hidden = false;
+    elHud.classList.remove('on');
+    elEscapar.classList.remove('on');
+    menina.raiz.visible = false;
+    estado.modo = 'monumentos';
+    elMonDica.style.opacity = '1';
+    setTimeout(() => { elMonDica.style.opacity = '0'; }, 6000);
+    await irParaMonumento(0);
+  }
+
+  /** Sai da visita e devolve o jogo ao pé da letra: cena 1, do zero. */
+  async function fecharMonumentos(entao) {
+    if (monTrocando) return;
+    monTrocando = true;
+    try {
+      elMon.hidden = true;
+      monVoo = null;
+      if (estado.faseIndice !== 0) {
+        elCarregando.hidden = false;
+        await carregarFase(0);
+        elCarregando.hidden = true;
+      }
+      estado.coracoes = CORACOES_CHEIOS;
+      atualizarCoracoes();
+      reiniciarPosicao(0);
+      estado.checkpoint = 0;
+      menina.raiz.visible = true;
+      pos.uniforms.forcaDof.value = preset.dof ? (fase.camera.dof ?? 0.85) : 0;
+      posicionarCameraAtras(true);
+      estado.modo = 'intro';
+    } finally {
+      monTrocando = false;
+    }
+    if (entao) entao();
+  }
+
+  $('#btn-monumentos').onclick = (e) => { e.preventDefault(); abrirMonumentos(); };
+  $('#mon-antes').onclick = () => irParaMonumento(monAtual - 1);
+  $('#mon-depois').onclick = () => irParaMonumento(monAtual + 1);
+  $('#mon-voltar').onclick = () => fecharMonumentos(() => { elIntro.hidden = false; });
+  $('#mon-correr').onclick = () => fecharMonumentos(comecar);
+  $('#mon-cartas').onclick = (e) => { e.preventDefault(); irParaCartas(); };
 
   /* ─────────── passo de lógica ─────────── */
 
@@ -934,7 +1217,7 @@ export function iniciar() {
 
     if (estado.modo === 'carregando') return;
 
-    if (estado.modo !== 'pausado') {
+    if (estado.modo !== 'pausado' && estado.modo !== 'monumentos') {
       lerGamepad();
       acumulador += dtReal;
       let voltas = 0;
@@ -951,20 +1234,21 @@ export function iniciar() {
     // obstáculos que se mexem
     for (const o of ativos) if (o.atualizar) o.atualizar(dt, o);
 
-    // a menina
-    menina.raiz.position.set(estado.x, estado.y, estado.dist);
-    menina.atualizar(dt, {
-      velocidade: estado.velocidade,
-      noChao: estado.noChao,
-      agachado: estado.agachado,
-      tropeco: estado.tropeco > 0,
-      x: estado.x,
-    });
-    // pisca enquanto está invulnerável, para a pancada ficar legível
-    const piscando = estado.invuln > 0 && Math.floor(estado.invuln * 12) % 2 === 0;
-    menina.raiz.visible = !piscando || estado.modo === 'final';
-
-    atualizarTrilha();
+    // a menina — na visita aos monumentos ela não está em cena
+    if (estado.modo !== 'monumentos') {
+      menina.raiz.position.set(estado.x, estado.y, estado.dist);
+      menina.atualizar(dt, {
+        velocidade: estado.velocidade,
+        noChao: estado.noChao,
+        agachado: estado.agachado,
+        tropeco: estado.tropeco > 0,
+        x: estado.x,
+      });
+      // pisca enquanto está invulnerável, para a pancada ficar legível
+      const piscando = estado.invuln > 0 && Math.floor(estado.invuln * 12) % 2 === 0;
+      menina.raiz.visible = !piscando || estado.modo === 'final';
+      atualizarTrilha();
+    }
     // legenda ao se aproximar de um marco do trajeto
     if (mundo && mundo.pontos && estado.modo === 'correndo') {
       for (const p of mundo.pontos) {
