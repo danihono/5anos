@@ -160,6 +160,7 @@ function criarChao(fase, comprimento) {
   );
   via.rotation.x = -Math.PI / 2;
   via.receiveShadow = true;
+  via.name = 'via';            // só para o `?sem=` do jogo.js conseguir apagar
   g.add(via);
 
   const calcTex = Mat.calcada(fase.molhado, fase.semente + 7);
@@ -171,6 +172,7 @@ function criarChao(fase, comprimento) {
     c.rotation.x = -Math.PI / 2;
     c.position.set(lado * (BORDA + LARGURA_CALCADA / 2), 0.16, 0);
     c.receiveShadow = true;
+    c.name = 'calcada';
     g.add(c);
 
     // meio-fio
@@ -575,6 +577,7 @@ function fazPisoDaClareira(p, fase) {
     for (const lado of [-1, 1]) {
       const agua = new Mesh(new PlaneGeometry(80, comp), matAgua);
       agua.rotation.x = -Math.PI / 2;
+    agua.name = 'agua';
       agua.position.set(lado * (FRENTE_PREDIO + 40), -1.3, p.z);
       g.add(agua);
     }
@@ -615,6 +618,7 @@ function fazPisoDaClareira(p, fase) {
     const agua = new Mesh(new PlaneGeometry(220, comp + 60),
       materialAgua(fase.corRio || '#3f6f80', [26, (comp + 60) / 8], [0.005, 0.012]));
     agua.rotation.x = -Math.PI / 2;
+    agua.name = 'agua';
     agua.position.set(lado * (FRENTE_PREDIO + larg + 110), -1.4, p.z);
     g.add(agua);
 

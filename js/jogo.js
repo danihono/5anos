@@ -411,6 +411,33 @@ export function iniciar() {
     await respirar('acendendo os postes…', 0.9);
   }
 
+  /* `?sem=texturas` é a chave que vale mais que todas as outras juntas: tira o
+     mapa de cor, o de normal, o de aspereza e o emissivo de TODO material da
+     cena e põe um cinza liso no lugar. Se o retângulo preto sumir, o defeito é
+     de TEXTURA (canvas que não desenhou, mipmap, espaço de cor). Se ficar, é de
+     GEOMETRIA ou de luz. É a divisão que a bissecção ainda não fez.
+
+     Roda de novo a cada tanto porque obstáculo nasce no meio da corrida: material
+     que ainda não existia quando a cena montou também tem que ser despido. O
+     conjunto de já-vistos deixa a repetição barata. */
+  const despidos = new Set();
+  function despirTexturas() {
+    if (!SEM.has('texturas')) return;
+    cena.traverse((o) => {
+      if (!o.isMesh) return;
+      for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+        if (!m || despidos.has(m.uuid)) continue;
+        despidos.add(m.uuid);
+        for (const k of ['map', 'normalMap', 'roughnessMap', 'emissiveMap', 'metalnessMap', 'aoMap']) {
+          if (m[k]) m[k] = null;
+        }
+        if (m.color) m.color.setHex(0x9a9a9a);
+        if (m.emissive) m.emissive.setHex(0x000000);
+        m.needsUpdate = true;
+      }
+    });
+  }
+
   /* Aplica o `?sem=` no mundo recém-montado. Vai no fim de cada `carregarFase`
      porque o `mundo` é desmontado e refeito a cada troca de cena. */
   function aplicarDiagnostico() {
@@ -424,6 +451,13 @@ export function iniciar() {
     if (SEM.has('pontos') && mundo.pontosGrupo) mundo.pontosGrupo.visible = false;
     if (SEM.has('marcos') && mundo.marcos) mundo.marcos.visible = false;
     if (SEM.has('menina')) menina.raiz.visible = false;
+
+    if (SEM.has('via') || SEM.has('calcada') || SEM.has('agua')) {
+      cena.traverse((o) => {
+        if (SEM.has(o.name)) o.visible = false;
+      });
+    }
+    despirTexturas();
     const u = pos.uniforms;
     if (SEM.has('dof')) u.forcaDof.value = 0;
     if (SEM.has('bloom')) u.forcaBloom.value = 0;
@@ -1304,6 +1338,8 @@ export function iniciar() {
     }
     if (luzHeroi.visible) luzHeroi.position.set(estado.x, estado.y + 2.6, estado.dist - 1.2);
     if (mundo) mundo.atualizar(dt, estado.dist, camera.position);
+    // obstáculo nasce no meio da corrida: o `?sem=texturas` tem que alcançá-lo
+    if (SEM.has('texturas') && Math.floor(agora / 500) % 2 === 0) despirTexturas();
     if (agencia) agencia.coracao.position.y = 8.4 + Math.sin(agora / 700) * 0.14;
 
     atualizarCamera(dt);
