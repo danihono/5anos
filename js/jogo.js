@@ -452,6 +452,21 @@ export function iniciar() {
     if (SEM.has('marcos') && mundo.marcos) mundo.marcos.visible = false;
     if (SEM.has('menina')) menina.raiz.visible = false;
 
+    /* `?sem=tudo` esconde TODO objeto da cena — sobra o céu de fundo e mais nada.
+       É o teste que decide a pergunta que a bissecção não conseguiu responder:
+       ela já apagou o chão, os prédios, os obstáculos, os marcos, os pontos, a
+       chuva, a sombra e o pós-processamento inteiro, um por um, e o retângulo
+       preto sobreviveu a todos. Ou tem alguma coisa que eu não estou alcançando,
+       ou o preto não é geometria — é a GPU dela devolvendo lixo. Com a cena
+       vazia, se o preto continuar, está provado que não é objeto nenhum. */
+    if (SEM.has('tudo')) {
+      for (const o of cena.children) {
+        if (o.isLight || o === mundo.ceu?.malha) continue;
+        o.visible = false;
+      }
+      menina.raiz.visible = false;
+    }
+
     if (SEM.has('via') || SEM.has('calcada') || SEM.has('agua')) {
       cena.traverse((o) => {
         if (SEM.has(o.name)) o.visible = false;
@@ -1318,7 +1333,7 @@ export function iniciar() {
       });
       // pisca enquanto está invulnerável, para a pancada ficar legível
       const piscando = estado.invuln > 0 && Math.floor(estado.invuln * 12) % 2 === 0;
-      menina.raiz.visible = !piscando || estado.modo === 'final';
+      menina.raiz.visible = (!piscando || estado.modo === 'final') && !SEM.has('tudo') && !SEM.has('menina');
       atualizarTrilha();
     }
     // legenda ao se aproximar de um marco do trajeto
