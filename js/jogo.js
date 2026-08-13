@@ -420,6 +420,10 @@ export function iniciar() {
       for (const b of mundo.blocos) b.grupo.visible = false;
     }
     if (SEM.has('ceu') && mundo.ceu) mundo.ceu.malha.visible = false;
+    if (SEM.has('chao') && mundo.chao) mundo.chao.visible = false;
+    if (SEM.has('pontos') && mundo.pontosGrupo) mundo.pontosGrupo.visible = false;
+    if (SEM.has('marcos') && mundo.marcos) mundo.marcos.visible = false;
+    if (SEM.has('menina')) menina.raiz.visible = false;
     const u = pos.uniforms;
     if (SEM.has('dof')) u.forcaDof.value = 0;
     if (SEM.has('bloom')) u.forcaBloom.value = 0;
@@ -461,6 +465,7 @@ export function iniciar() {
   /* ─────────── obstáculos ativos ─────────── */
 
   function alimentarObstaculos() {
+    if (SEM.has('obstaculos')) return;
     const limite = estado.dist + preset.distancia * 0.72;
     while (proximoItem < trajeto.length && trajeto[proximoItem].z < limite) {
       const it = trajeto[proximoItem++];

@@ -2766,5 +2766,8 @@ export function criarMundo(cena, renderer, fase, preset) {
     cena.environment = null;
   }
 
-  return { grupo, atualizar, dispose, ajustarSombra, sol, ceu, blocos, chuva, pontos, voos };
+  /* `chao`, `pontosGrupo` e `marcos` saem daqui só para o `?sem=` do `jogo.js`
+     conseguir apagar um de cada vez. Nada no jogo os usa. */
+  return { grupo, atualizar, dispose, ajustarSombra, sol, ceu, blocos, chuva, pontos, voos,
+           chao, pontosGrupo, marcos };
 }
