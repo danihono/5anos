@@ -234,6 +234,28 @@ regra número um aqui é o presente abrir com dois cliques, sem servidor.
 
 Os onze `.mp4` em `videos/` são referenciados por caminho relativo em `CONFIG.cartas[].video`, dentro do `correio-dos-apaixonados-v2.html`. Um deles tem espaços no nome (`1 ano de namoro.mp4`) — funciona, mas se algum dia for para um host mais rígido, vale renomear.
 
+Embaixo de cada bobina há uma fita com três opções: **som**, **tela cheia** e **baixar o
+vídeo**. Três decisões atrás disso:
+
+- **Baixar é um `<a download>` de verdade**, sem JavaScript nenhum, para valer o clique do
+  meio e o "salvar link como". O nome sai bonito (`5 anos - 01 - O dia em que eu pedi.mp4`)
+  em vez do nome interno da pasta. Ele leva `target="_blank"` por causa do `file://`: ali
+  alguns navegadores ignoram o `download` e simplesmente **abrem** o vídeo, e sem o
+  `_blank` isso levaria a página das cartas embora — junto com quais cartas já foram
+  abertas, que só existem na memória.
+- **Tela cheia leva a moldura inteira, não o `<video>`** — assim grão, vinheta e a
+  etiqueta da bobina continuam por cima em tela cheia. O iPhone é a exceção e por isso
+  existe a queda para `webkitEnterFullscreen()`: lá um `<div>` não vai para tela cheia,
+  só o player nativo do vídeo vai.
+- **Entrar em tela cheia liga o som e os controles nativos.** O vídeo na carta toca mudo
+  porque navegador nenhum deixa tocar com som sem gesto — o clique em "tela cheia" é esse
+  gesto, e quem pede tela cheia quer assistir de verdade. Sair devolve a bobina limpa.
+
+Uma armadilha que essa fita criou e que vale lembrar se mexer nela: grão, vinheta e
+etiquetas se penduravam na `.film` inteira. Com a fita embaixo do vídeo, o `bottom` delas
+passou a ser o pé da fita, e a etiqueta desceu em cima dos botões. Por isso o vídeo e as
+sobreposições moram num `.frame` — o `bottom` é do vídeo, como sempre foi.
+
 ## Créditos
 
 Three.js r185 (MIT), embutido — licença em `vendor/three/LICENSE`.

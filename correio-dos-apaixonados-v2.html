@@ -332,6 +332,10 @@
   .film{position:relative;margin:18px 0 6px;border-radius:6px;overflow:hidden;
     background:#17090c;box-shadow:0 10px 26px rgba(30,4,10,.45), inset 0 0 0 3px #2b1216;
     border:6px solid #24080d}
+  /* O quadro é quem carrega grão, vinheta e etiquetas. Antes eles se penduravam
+     na .film inteira; com a fita de controles embaixo, a etiqueta da bobina
+     descia em cima dos botões. Agora o `bottom:8px` é do vídeo, como sempre foi. */
+  .film .frame{position:relative}
   .film video{display:block;width:100%;height:auto;object-fit:contain;background:#000}
   .film .grain-ov{position:absolute;inset:0;pointer-events:none;opacity:.5;mix-blend-mode:overlay;
     background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.5'/%3E%3C/svg%3E");
@@ -345,8 +349,19 @@
     font-size:10.5px;letter-spacing:.14em;color:#ff8f9b;text-shadow:0 1px 2px #000;
     animation:blinkrec 1.4s steps(1) infinite}
   @keyframes blinkrec{50%{opacity:.25}}
-  .film .mute-btn{position:absolute;right:8px;bottom:8px;background:rgba(20,5,8,.65);color:#ffe3d6;border:1px solid rgba(255,220,200,.35);
-    border-radius:4px;font-family:'Special Elite',monospace;font-size:10px;letter-spacing:.1em;padding:5px 9px}
+  /* fita de controles: mora embaixo do vídeo, dentro da moldura da bobina, para
+     não brigar com a etiqueta "BOBINA Nº" em tela estreita */
+  .film .film-tools{position:relative;z-index:3;display:flex;flex-wrap:wrap;gap:6px;
+    justify-content:flex-end;align-items:center;padding:7px 8px;background:#17090c;border-top:1px solid #3a1a20}
+  .film .film-btn{background:rgba(20,5,8,.65);color:#ffe3d6;border:1px solid rgba(255,220,200,.35);
+    border-radius:4px;font-family:'Special Elite',monospace;font-size:10px;letter-spacing:.1em;
+    padding:6px 10px;text-decoration:none;display:inline-block;white-space:nowrap}
+  .film .film-btn:hover{background:rgba(60,14,20,.9);border-color:rgba(255,220,200,.6)}
+  /* no celular os três cabem numa linha só apertando um pouco a letra */
+  @media (max-width:520px){
+    .film .film-tools{gap:5px;padding:7px 6px}
+    .film .film-btn{font-size:9px;letter-spacing:.04em;padding:6px 7px}
+  }
   /* bobina em revelação (placeholder sem vídeo) */
   .film .developing{aspect-ratio:16/9;display:grid;place-items:center;color:#caa0a6;text-align:center}
   .film .developing .reel{width:52px;height:52px;border-radius:50%;margin:0 auto 10px;position:relative;
@@ -356,6 +371,26 @@
     border-radius:50%;background:#6b3a42}
   @keyframes spinreel{to{transform:rotate(360deg)}}
   .film .developing p{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.22em}
+  /* ── a bobina em tela cheia ──
+     Os dois blocos abaixo são o mesmo CSS: `:fullscreen` e o `:-webkit-full-screen`
+     do Safari antigo NÃO podem dividir a mesma lista de seletores — pseudo-classe
+     desconhecida invalida a regra inteira, e aí nenhum dos dois vale. */
+  .film:fullscreen{margin:0;border:0;border-radius:0;box-shadow:none;background:#000;
+    width:100%;height:100%;display:flex;flex-direction:column}
+  .film:fullscreen .frame{flex:1;min-height:0;display:flex}
+  .film:fullscreen video{width:100%;height:100%;min-height:0}
+  .film:fullscreen .grain-ov{opacity:.22}
+  .film:fullscreen .reel-tag{left:18px;top:16px;bottom:auto;font-size:12px}
+  .film:fullscreen .heart-rec{right:18px;top:16px;font-size:12px}
+  .film:fullscreen .film-tools{background:rgba(10,2,4,.72);border-top:0;padding:12px 16px}
+  .film:-webkit-full-screen{margin:0;border:0;border-radius:0;box-shadow:none;background:#000;
+    width:100%;height:100%;display:flex;flex-direction:column}
+  .film:-webkit-full-screen .frame{flex:1;min-height:0;display:flex}
+  .film:-webkit-full-screen video{width:100%;height:100%;min-height:0}
+  .film:-webkit-full-screen .grain-ov{opacity:.22}
+  .film:-webkit-full-screen .reel-tag{left:18px;top:16px;bottom:auto;font-size:12px}
+  .film:-webkit-full-screen .heart-rec{right:18px;top:16px;font-size:12px}
+  .film:-webkit-full-screen .film-tools{background:rgba(10,2,4,.72);border-top:0;padding:12px 16px}
 
   /* telegrama */
   .letter.tg{background:var(--grain), linear-gradient(180deg,var(--telegram),#e8d296)}
@@ -669,12 +704,15 @@ function updateProgress(){
 updateProgress();
 
 function closeOverlay(){
+  sairDaTelaCheia();
   stageContent.querySelectorAll('video').forEach(v=>v.pause());
   overlay.classList.remove('open'); stageContent.innerHTML='';
 }
 document.getElementById('close-x').onclick=closeOverlay;
 overlay.addEventListener('click', e=>{ if(e.target===overlay) closeOverlay(); });
-addEventListener('keydown', e=>{ if(e.key==='Escape') closeOverlay(); });
+/* Esc na tela cheia é do navegador, não nosso: sair do vídeo não pode fechar a
+   carta junto. O primeiro Esc devolve a bobina para a carta; o segundo fecha. */
+addEventListener('keydown', e=>{ if(e.key==='Escape' && !emTelaCheia()) closeOverlay(); });
 
 /* ── envelope: lacre → aba → carta sobe → carta vem à frente ── */
 function openItem(i){
@@ -761,25 +799,41 @@ function setupSeal(c, onBreak){
 }
 
 /* ── carta completa (com filme) ── */
+/* Nome amigável do arquivo baixado: "5 anos - 03 - Nosso primeiro mar.mp4" em vez
+   do nome interno da pasta. Tira só o que sistema de arquivos nenhum aceita. */
+function nomeDoArquivo(c, i){
+  /* telegrama não tem título; nele a data faz esse papel */
+  const base=(c.titulo || `${c.tipo} de ${c.data}`).replace(/[\\/:*?"<>|]/g,'').trim();
+  return `5 anos - ${String(i+1).padStart(2,'0')} - ${base}.mp4`;
+}
 function filmHTML(c, i){
   if(c.video){
     const poster=c.poster?`poster="${c.poster}"`:'';
     return `
       <div class="film">
-        <video src="${c.video}" ${poster} autoplay muted playsinline loop id="vid-${i}"></video>
-        <div class="grain-ov"></div><div class="vignette"></div>
-        <div class="reel-tag">BOBINA Nº ${String(i+1).padStart(2,'0')} · ${c.data}</div>
-        <div class="heart-rec">● REC ♥</div>
-        <button class="mute-btn" data-v="vid-${i}">🔇 ATIVAR SOM</button>
+        <div class="frame">
+          <video src="${c.video}" ${poster} autoplay muted playsinline loop id="vid-${i}"></video>
+          <div class="grain-ov"></div><div class="vignette"></div>
+          <div class="reel-tag">BOBINA Nº ${String(i+1).padStart(2,'0')} · ${c.data}</div>
+          <div class="heart-rec">● REC ♥</div>
+        </div>
+        <div class="film-tools">
+          <button class="film-btn mute-btn" type="button">🔇 ATIVAR SOM</button>
+          <button class="film-btn fs-btn" type="button">⛶ TELA CHEIA</button>
+          <a class="film-btn dl-btn" href="${encodeURI(c.video)}" download="${nomeDoArquivo(c,i)}"
+             target="_blank" rel="noopener" title="salvar este vídeo no aparelho">⬇ BAIXAR VÍDEO</a>
+        </div>
       </div>`;
   }
   return `
     <div class="film">
-      <div class="developing">
-        <div><div class="reel"></div>
-        <p>BOBINA Nº ${String(i+1).padStart(2,'0')} EM REVELAÇÃO<br>— em breve nesta agência —</p></div>
+      <div class="frame">
+        <div class="developing">
+          <div><div class="reel"></div>
+          <p>BOBINA Nº ${String(i+1).padStart(2,'0')} EM REVELAÇÃO<br>— em breve nesta agência —</p></div>
+        </div>
+        <div class="grain-ov"></div><div class="vignette"></div>
       </div>
-      <div class="grain-ov"></div><div class="vignette"></div>
     </div>`;
 }
 
@@ -819,15 +873,68 @@ function revealLetter(i){
         <div class="kiss">💋</div>
       </div>`;
   }
-  const mb=stageContent.querySelector('.mute-btn');
-  if(mb){
-    mb.onclick=()=>{
-      const v=document.getElementById(mb.dataset.v);
-      v.muted=!v.muted;
-      mb.textContent=v.muted?'🔇 ATIVAR SOM':'🔊 SOM LIGADO';
-    };
-  }
+  ligarControlesDoFilme();
 }
+
+/* ── controles da bobina: som, tela cheia e baixar ──
+   O "baixar" é um <a download> de verdade, sem JavaScript nenhum: assim vale o
+   clique do meio, o "salvar link como" e o teclado. Em file:// alguns
+   navegadores ignoram o `download` e apenas abrem o vídeo — por isso o
+   target="_blank", para que a página das cartas nunca se perca no caminho. */
+function ligarControlesDoFilme(){
+  const film=stageContent.querySelector('.film');
+  const v=film && film.querySelector('video');
+  if(!v) return;
+  const mb=film.querySelector('.mute-btn');
+  const fb=film.querySelector('.fs-btn');
+  mb.onclick=()=>{ v.muted=!v.muted; atualizarMute(film); };
+  fb.onclick=()=>alternarTelaCheia(film, v);
+  /* iPhone abre o player nativo: quando ela sai dele, a bobina volta limpa */
+  v.addEventListener('webkitendfullscreen', ()=>{ v.controls=false; });
+}
+
+function atualizarMute(film){
+  const v=film.querySelector('video'), mb=film.querySelector('.mute-btn');
+  if(mb) mb.textContent=v.muted?'🔇 ATIVAR SOM':'🔊 SOM LIGADO';
+}
+
+function emTelaCheia(){ return document.fullscreenElement || document.webkitFullscreenElement || null; }
+
+function alternarTelaCheia(film, v){
+  if(emTelaCheia()){ sairDaTelaCheia(); return; }
+  /* quem pede tela cheia quer assistir de verdade — e o clique é o gesto que o
+     navegador exige para deixar o som entrar */
+  if(v.muted){ v.muted=false; atualizarMute(film); }
+  const pedir=film.requestFullscreen || film.webkitRequestFullscreen;
+  if(pedir){
+    const p=pedir.call(film);
+    if(p && p.catch) p.catch(()=>telaCheiaDoIOS(v));
+  } else telaCheiaDoIOS(v);
+}
+
+function telaCheiaDoIOS(v){
+  /* no iPhone um <div> não vai para tela cheia; só o player nativo do vídeo vai */
+  if(v.webkitEnterFullscreen){ v.controls=true; v.webkitEnterFullscreen(); }
+}
+
+function sairDaTelaCheia(){
+  const sair=document.exitFullscreen || document.webkitExitFullscreen;
+  if(sair && emTelaCheia()) sair.call(document);
+}
+
+/* Uma escuta só, no documento: o navegador também tira da tela cheia sozinho
+   (Esc, gesto do sistema), então rótulo e controles nativos seguem o estado
+   real em vez de seguirem o clique. */
+['fullscreenchange','webkitfullscreenchange'].forEach(ev=>
+  document.addEventListener(ev, ()=>{
+    const cheio=emTelaCheia();
+    stageContent.querySelectorAll('.film').forEach(film=>{
+      const dentro=(cheio===film);
+      const fb=film.querySelector('.fs-btn'), v=film.querySelector('video');
+      if(fb) fb.textContent=dentro?'⤢ SAIR DA TELA CHEIA':'⛶ TELA CHEIA';
+      if(v) v.controls=dentro;   // controles nativos só na tela cheia, para poder pausar e voltar
+    });
+  }));
 
 /* ── encomenda + assinatura ── */
 function openParcel(){
